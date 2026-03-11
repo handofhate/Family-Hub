@@ -1108,6 +1108,16 @@
 </head>
 <body>
 
+  <!-- ═══════════ SCREEN: AUTH (Google Sign-In) ═══════════ -->
+  <div id="screen-auth" class="screen active" style="background:linear-gradient(145deg,#667eea,#764ba2);align-items:center;justify-content:center;padding:24px;gap:20px;text-align:center">
+    <div style="font-size:4rem">⭐</div>
+    <div style="color:#fff;font-size:2rem;font-weight:800;text-shadow:0 2px 12px rgba(0,0,0,0.25)">Family Hub</div>
+    <div id="auth-msg" style="color:rgba(255,255,255,0.85);font-size:1rem">Sign in to continue</div>
+    <button id="signin-btn" onclick="signIn()" style="background:#fff;color:#333;border:none;padding:14px 32px;border-radius:50px;font-size:1.05rem;font-weight:700;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,0.2)">
+      Sign in with Google
+    </button>
+  </div>
+
   <!-- ═══════════ SCREEN: HOME (Profile Picker) ═══════════ -->
   <div id="screen-home" class="screen">
     <div id="home-content"></div>
@@ -1151,7 +1161,56 @@
   <div id="celebration-root"></div>
   <div id="confetti-root"></div>
 
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
   <script>
+/* ═══════════════════════════════════════════════════════════════
+   FIREBASE CONFIG + AUTH
+═══════════════════════════════════════════════════════════════ */
+
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyAt-6FAoqpM5IR_XB6AnMcDUTRZwKdosr8",
+  authDomain:        "family-hub-9ad4d.firebaseapp.com",
+  projectId:         "family-hub-9ad4d",
+  storageBucket:     "family-hub-9ad4d.firebasestorage.app",
+  messagingSenderId: "280625694071",
+  appId:             "1:280625694071:web:ecedf22458fd9214474d72",
+};
+
+const ALLOWED_EMAILS = [
+  'tylerlynncollum@gmail.com',
+  'zmcollum@gmail.com',
+  'gtcollum@gmail.com',
+  'agcollum@gmail.com',
+];
+
+const FAMILY_DOC = 'families/collum';
+
+firebase.initializeApp(FIREBASE_CONFIG);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+
+function signIn() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).catch(err => {
+    document.getElementById('auth-msg').textContent = 'Sign-in failed. Please try again.';
+    console.warn('Sign-in error:', err);
+  });
+}
+
+function signOut() {
+  if (firestoreUnsub) { firestoreUnsub(); firestoreUnsub = null; }
+  auth.signOut().then(() => {
+    D = {};
+    showScreen('screen-auth');
+    document.getElementById('auth-msg').textContent = 'Sign in to continue';
+    document.getElementById('signin-btn').style.display = '';
+  });
+}
+
 /* ═══════════════════════════════════════════════════════════════
    CHUNK 2 — DATA LAYER · UTILITIES · ANIMATIONS · CLOUD SYNC
 ═══════════════════════════════════════════════════════════════ */
@@ -1221,8 +1280,6 @@ function defaultData() {
       autoApprove:     false,
       pointsPerDollar: 10,
       currency:        '$',
-      cloudBinId:      '',
-      cloudApiKey:     '',
       lastSync:        null,
     },
     family: { name:'Our Family', members:[] },
@@ -1234,8 +1291,9 @@ function defaultData() {
   };
 }
 
-// ── LOCALSTORAGE ──────────────────────────────────────────────
+// ── DATA LAYER (Firestore + localStorage cache) ───────────────
 const LS_KEY = 'familyHub_v2';
+let firestoreUnsub = null;
 
 function loadData() {
   try {
@@ -1248,7 +1306,42 @@ function loadData() {
 
 function saveData() {
   try { localStorage.setItem(LS_KEY, JSON.stringify(D)); } catch(e) {}
-  if (D.settings.cloudBinId) syncToCloud();
+  pushToFirestore();
+}
+
+async function pushToFirestore() {
+  try {
+    S.syncStatus = 'syncing';
+    updateSyncBar();
+    await db.doc(FAMILY_DOC).set(D);
+    S.syncStatus = 'ok';
+    updateSyncBar();
+  } catch(e) {
+    S.syncStatus = 'error';
+    updateSyncBar();
+    console.warn('Firestore write error:', e);
+  }
+}
+
+function subscribeToFirestore() {
+  if (firestoreUnsub) firestoreUnsub();
+  firestoreUnsub = db.doc(FAMILY_DOC).onSnapshot(snap => {
+    if (snap.exists) {
+      const incoming = snap.data();
+      // Only update if data changed to avoid re-render loops
+      if (JSON.stringify(incoming) !== JSON.stringify(D)) {
+        D = incoming;
+        try { localStorage.setItem(LS_KEY, JSON.stringify(D)); } catch(e) {}
+        S.syncStatus = 'ok';
+        updateSyncBar();
+        renderCurrentView();
+      }
+    }
+  }, err => {
+    S.syncStatus = 'error';
+    updateSyncBar();
+    console.warn('Firestore listener error:', err);
+  });
 }
 
 // ── UTILITIES ─────────────────────────────────────────────────
@@ -1521,75 +1614,15 @@ function showScreen(id) {
   document.getElementById(id).classList.add('active');
 }
 
-// ── CLOUD SYNC (JSONbin.io) ───────────────────────────────────
-let syncTimer = null;
-
-async function syncToCloud() {
-  if (!D.settings.cloudBinId) return;
-  S.syncStatus = 'syncing';
-  updateSyncBar();
-  try {
-    const headers = { 'Content-Type':'application/json' };
-    if (D.settings.cloudApiKey) headers['X-Access-Key'] = D.settings.cloudApiKey;
-    headers['X-Bin-Versioning'] = 'false';
-
-    const res = await fetch(`https://api.jsonbin.io/v3/b/${D.settings.cloudBinId}`, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify(D),
-    });
-    if (!res.ok) throw new Error('HTTP '+res.status);
-    D.settings.lastSync = new Date().toISOString();
-    localStorage.setItem(LS_KEY, JSON.stringify(D));
-    S.syncStatus = 'ok';
-  } catch(e) {
-    S.syncStatus = 'error';
-    console.warn('Cloud sync error:', e);
-  }
-  updateSyncBar();
-}
-
-async function syncFromCloud() {
-  if (!D.settings.cloudBinId) return;
-  S.syncStatus = 'syncing';
-  updateSyncBar();
-  try {
-    const headers = {};
-    if (D.settings.cloudApiKey) headers['X-Access-Key'] = D.settings.cloudApiKey;
-
-    const res  = await fetch(`https://api.jsonbin.io/v3/b/${D.settings.cloudBinId}/latest`, { headers });
-    if (!res.ok) throw new Error('HTTP '+res.status);
-    const json = await res.json();
-    if (json.record) {
-      D = json.record;
-      localStorage.setItem(LS_KEY, JSON.stringify(D));
-      S.syncStatus = 'ok';
-      renderCurrentView();
-    }
-  } catch(e) {
-    S.syncStatus = 'error';
-    console.warn('Cloud fetch error:', e);
-  }
-  updateSyncBar();
-}
-
 function updateSyncBar() {
   ['kid-sync-bar','parent-sync-bar'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
-    if (!D.settings.cloudBinId) { el.innerHTML=''; return; }
     if (S.syncStatus==='syncing') { el.className='sync-bar'; el.textContent='☁️ Syncing...'; }
     else if (S.syncStatus==='ok')  { el.className='sync-bar ok'; el.textContent='☁️ Synced'; setTimeout(()=>{el.innerHTML=''},3000); }
     else if (S.syncStatus==='error'){ el.className='sync-bar error'; el.textContent='⚠️ Sync failed — check connection'; }
     else { el.innerHTML=''; }
   });
-}
-
-function startSyncPoller() {
-  if (syncTimer) clearInterval(syncTimer);
-  if (D.settings.cloudBinId) {
-    syncTimer = setInterval(syncFromCloud, 45000); // poll every 45s
-  }
 }
 
 // ── RE-RENDER CURRENT VIEW ────────────────────────────────────
@@ -1834,24 +1867,14 @@ function renderSetupStep() {
       <div class="setup-top" style="padding-top:20px">
         <div class="setup-emoji">☁️</div>
         <div class="setup-title">Family Sync</div>
-        <div class="setup-sub">Keep all devices (iPads, phones, PC) in sync automatically.</div>
+        <div class="setup-sub">All devices sync automatically — nothing to configure!</div>
       </div>
-      <div class="card" style="background:#F5F3FF;border:2px solid var(--purple);margin-bottom:14px">
-        <div class="card-title">🔗 How sync works</div>
+      <div class="card" style="background:#F0FDF4;border:2px solid var(--green);margin-bottom:14px">
+        <div class="card-title">✅ Sync is enabled</div>
         <p style="font-size:0.88rem;line-height:1.6;color:var(--muted)">
-          1. Create a free account at <strong>jsonbin.io</strong><br>
-          2. Click <em>New Bin</em>, paste <code>{}</code>, save it<br>
-          3. Copy the Bin ID from the URL<br>
-          4. Paste it below — all devices will stay in sync!
+          Family Hub uses Google Firestore to keep all devices in sync in real time.
+          Any change made on one device will appear on all others instantly.
         </p>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Bin ID <span class="form-label-hint">(optional — skip to use local only)</span></label>
-        <input type="text" id="setup-bin-id" placeholder="e.g. 64abc123def456..." value="${esc(D.settings.cloudBinId||'')}">
-      </div>
-      <div class="form-group">
-        <label class="form-label">API Key <span class="form-label-hint">(optional, for private bins)</span></label>
-        <input type="password" id="setup-api-key" placeholder="$2b$10$..." value="${esc(D.settings.cloudApiKey||'')}">
       </div>
       <div class="toggle-row">
         <div>
@@ -2035,14 +2058,10 @@ function setupNext() {
   }
 
   if (stepName === 'sync') {
-    const binEl  = document.getElementById('setup-bin-id');
-    const keyEl  = document.getElementById('setup-api-key');
     const autoEl = document.getElementById('setup-auto-approve');
     const pinEl  = document.getElementById('setup-pin');
-    if (binEl)  D.settings.cloudBinId    = binEl.value.trim();
-    if (keyEl)  D.settings.cloudApiKey   = keyEl.value.trim();
-    if (autoEl) D.settings.autoApprove   = autoEl.checked;
-    if (pinEl)  D.settings.parentPin     = pinEl.value.trim();
+    if (autoEl) D.settings.autoApprove = autoEl.checked;
+    if (pinEl)  D.settings.parentPin   = pinEl.value.trim();
   }
 
   S.setupStep++;
@@ -2075,7 +2094,6 @@ function finishSetup() {
 
   D.setup = true;
   saveData();
-  startSyncPoller();
   renderHome();
 }
 
@@ -2649,7 +2667,7 @@ function renderParentHeader() {
     </div>
     <div style="display:flex;gap:8px;align-items:center">
       ${pending>0?`<span class="header-badge" style="background:#EF4444;color:#fff">⏳ ${pending}</span>`:''}
-      <button class="btn-icon-sm" style="background:#EDE9FE;color:var(--purple)" onclick="syncFromCloud()" title="Sync now">☁️</button>
+      <button class="btn-icon-sm" style="background:#EDE9FE;color:var(--purple)" onclick="pushToFirestore()" title="Sync now">☁️</button>
     </div>`;
 }
 
@@ -3261,24 +3279,14 @@ function renderParentSettings() {
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" style="background:#F0FDF4;border:2px solid var(--green)">
       <div class="card-title">☁️ Cloud Sync</div>
       <p style="font-size:0.85rem;color:var(--muted);margin-bottom:14px">
-        Get a free Bin ID from <strong>jsonbin.io</strong> to sync across all devices automatically.
+        Sync is powered by Google Firestore and runs automatically in real time. No configuration needed.
       </p>
-      <div class="form-group">
-        <label class="form-label">Bin ID</label>
-        <input type="text" id="s-binid" value="${esc(s.cloudBinId||'')}" placeholder="64abc..."
-               onchange="saveSetting('cloudBinId',this.value.trim())">
-      </div>
-      <div class="form-group">
-        <label class="form-label">API Key <span class="form-label-hint">optional</span></label>
-        <input type="password" id="s-apikey" value="${esc(s.cloudApiKey||'')}" placeholder="$2b$10$..."
-               onchange="saveSetting('cloudApiKey',this.value.trim())">
-      </div>
-      <div style="display:flex;gap:10px">
-        <button class="btn btn-teal btn-sm" onclick="syncFromCloud()">⬇️ Pull from Cloud</button>
-        <button class="btn btn-primary btn-sm" onclick="syncToCloud()">⬆️ Push to Cloud</button>
+      <div style="display:flex;gap:10px;align-items:center">
+        <span style="font-size:0.9rem;color:var(--green);font-weight:600">✅ Active</span>
+        <button class="btn btn-secondary btn-sm" onclick="signOut()">Sign Out</button>
       </div>
       ${s.lastSync?`<div style="font-size:0.78rem;color:var(--muted);margin-top:8px">Last synced: ${new Date(s.lastSync).toLocaleString()}</div>`:''}
     </div>
@@ -3310,7 +3318,6 @@ function renderParentSettings() {
 function saveSetting(key, value) {
   D.settings[key] = value;
   saveData();
-  if (key==='cloudBinId') startSyncPoller();
 }
 
 function showAddPointsModal(memberId) {
@@ -3351,6 +3358,8 @@ function resetAllData() {
   if (!confirm('This will erase ALL family data. Are you absolutely sure?')) return;
   if (!confirm('Last chance — really reset everything?')) return;
   localStorage.removeItem(LS_KEY);
+  if (firestoreUnsub) { firestoreUnsub(); firestoreUnsub = null; }
+  db.doc(FAMILY_DOC).delete().catch(e => console.warn('Firestore delete error:', e));
   D = defaultData();
   location.reload();
 }
@@ -3580,18 +3589,30 @@ function grandmaActivityCard(a) {
 ═══════════════════════════════════════════════════════════════ */
 
 function init() {
-  loadData();
-  if (!D.setup || D.family.members.length === 0) {
-    // First time: go to setup wizard
-    S.setupMembers = [];
-    S.setupStep    = 0;
-    showScreen('screen-setup');
-    renderSetupStep();
-  } else {
-    startSyncPoller();
-    if (D.settings.cloudBinId) syncFromCloud();
-    renderHome();
-  }
+  auth.onAuthStateChanged(user => {
+    if (!user) {
+      showScreen('screen-auth');
+      return;
+    }
+    if (!ALLOWED_EMAILS.includes(user.email)) {
+      document.getElementById('auth-msg').textContent =
+        `${user.email} is not authorized. Contact the family admin.`;
+      document.getElementById('signin-btn').style.display = 'none';
+      auth.signOut();
+      showScreen('screen-auth');
+      return;
+    }
+    loadData(); // load from localStorage cache first (instant)
+    subscribeToFirestore(); // then sync from Firestore in real time
+    if (!D.setup || D.family.members.length === 0) {
+      S.setupMembers = [];
+      S.setupStep    = 0;
+      showScreen('screen-setup');
+      renderSetupStep();
+    } else {
+      renderHome();
+    }
+  });
 }
 
 // Start on DOM ready
