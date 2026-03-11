@@ -1209,6 +1209,30 @@ function clearRedirectAttempt() {
   catch (_) {}
 }
 
+function redirectTroubleshootingHint() {
+  try {
+    const appProtocol = window.location.protocol;
+    const appHost = window.location.hostname;
+    const authHost = (FIREBASE_CONFIG.authDomain || '').toLowerCase();
+    const sameHost = appHost && authHost && appHost.toLowerCase() === authHost;
+    const localhostLike = appHost === 'localhost' || appHost === '127.0.0.1';
+
+    if (appProtocol === 'file:') {
+      return 'This page is opened as a local file. Firebase Google sign-in requires an http(s) hosted URL.';
+    }
+    if (appProtocol !== 'https:' && !localhostLike) {
+      return 'This page is not on HTTPS. Use an HTTPS URL for Google/Firebase auth redirects.';
+    }
+    if (!sameHost && !authHost.endsWith('.firebaseapp.com')) {
+      return `Auth domain mismatch: app is ${appHost}, Firebase authDomain is ${authHost}. Set authDomain to the app domain and authorize https://${appHost}/__/auth/handler in Firebase Auth.`;
+    }
+    if (!sameHost && authHost.endsWith('.firebaseapp.com')) {
+      return `App domain (${appHost}) differs from authDomain (${authHost}). On Safari, redirect sign-in often fails unless authDomain uses the same app domain with /__/auth/handler configured.`;
+    }
+  } catch (_) {}
+  return 'Check Firebase redirect best-practice setup for your hosting domain.';
+}
+
 function signIn() {
   const provider = new firebase.auth.GoogleAuthProvider();
   markRedirectAttempt();
@@ -3630,7 +3654,7 @@ async function init() {
       if (recentRedirect) {
         clearRedirectAttempt();
         document.getElementById('auth-msg').textContent =
-          'Google sign-in was interrupted before completion. On iPad, allow Google/Firebase auth pages, then try again.';
+          `Google sign-in was interrupted before completion. ${redirectTroubleshootingHint()}`;
       }
       document.getElementById('signin-btn').style.display = '';
       return;
