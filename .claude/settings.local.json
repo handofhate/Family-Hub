@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n \"isTiny\\\\|grandmaSetupCard\\\\|kidSetupCard\\\\|setupGrandma\\\\|addKidCard\\\\|toggleGrandma\\\\|selectProfile\\\\|displayMode\\\\|birthday\\\\|SETUP_STEPS\\\\|case ''members''\\\\|grandma-card\\\\|grandma-toggle\" \"c:\\\\Users\\\\Ty\\\\Documents\\\\LifeApp\\\\family-hub.html\")",
+      "Bash(mv \"c:\\\\Users\\\\Ty\\\\Documents\\\\Family Hub\\\\Family Hub\\\\.git\" \"c:\\\\Users\\\\Ty\\\\Documents\\\\Family Hub\\\\.git\")",
+      "Bash(mv \"c:\\\\Users\\\\Ty\\\\Documents\\\\Family Hub\\\\Family Hub\\\\.gitattributes\" \"c:\\\\Users\\\\Ty\\\\Documents\\\\Family Hub\\\\.gitattributes\")",
+      "Bash(rmdir \"c:\\\\Users\\\\Ty\\\\Documents\\\\Family Hub\\\\Family Hub\")"
+    ]
+  }
+}
