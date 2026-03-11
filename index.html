@@ -1195,10 +1195,7 @@ const db   = firebase.firestore();
 
 function signIn() {
   const provider = new firebase.auth.GoogleAuthProvider();
-  auth.signInWithPopup(provider).catch(err => {
-    document.getElementById('auth-msg').textContent = 'Sign-in failed. Please try again.';
-    console.warn('Sign-in error:', err);
-  });
+  auth.signInWithRedirect(provider);
 }
 
 function signOut() {
