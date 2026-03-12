@@ -2,26 +2,26 @@
   "name": "Family Hub",
   "short_name": "Family Hub",
   "description": "Chores, rewards, and goals for the whole family",
-  "start_url": "/",
+  "start_url": "/Family-Hub/",
   "display": "standalone",
   "background_color": "#F0F4FF",
   "theme_color": "#6C63FF",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "icon.svg",
+      "src": "/Family-Hub/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "icon-192.png",
+      "src": "/Family-Hub/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icon-512.png",
+      "src": "/Family-Hub/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
