@@ -179,12 +179,12 @@
     ══════════════════════════════════════════ */
     .nav-bar {
       position: fixed;
-      bottom: 10px; left: 12px; right: 12px;
+      bottom: 0; left: 0; right: 0;
       background: #fff;
       display: flex;
       border-top: 1px solid var(--border);
       padding: 0 10px calc(env(safe-area-inset-bottom, 0px) + 12px);
-      border-radius: 22px;
+      border-radius: 22px 22px 0 0;
       z-index: 100;
       box-shadow: 0 -4px 20px rgba(0,0,0,0.07);
     }
@@ -1179,7 +1179,7 @@
     @media (min-width: 768px) {
       .main-content     { max-width: 1080px; margin: 0 auto; padding-left: 24px; padding-right: 24px; }
       .app-header       { max-width: 1080px; margin: 0 auto; left: 50%; transform: translateX(-50%); width: calc(100% - 24px); position: sticky; }
-      .nav-bar          { max-width: 900px; left: 50%; right: auto; width: calc(100% - 24px); transform: translateX(-50%); border-radius: 24px; }
+      .nav-bar          { max-width: 900px; left: 50%; right: auto; bottom: 10px; width: calc(100% - 24px); transform: translateX(-50%); border-radius: 24px; }
       .prize-grid       { grid-template-columns: repeat(3, 1fr); }
       .stats-grid       { grid-template-columns: repeat(4, 1fr); }
       .pin-grid         { max-width: 280px; }
@@ -3014,7 +3014,7 @@ function updateSyncBar() {
     const el = document.getElementById(id);
     if (!el) return;
     if (S.syncStatus==='syncing') { el.className='sync-bar'; el.textContent='☁️ Syncing...'; }
-    else if (S.syncStatus==='ok')  { el.className='sync-bar ok'; el.textContent='☁️ Synced'; setTimeout(()=>{el.innerHTML=''},3000); }
+    else if (S.syncStatus==='ok')  { el.className='sync-bar ok'; el.textContent='☁️ Synced'; setTimeout(()=>{ el.className=''; el.innerHTML=''; },3000); }
     else if (S.syncStatus==='error'){ el.className='sync-bar error'; el.textContent='⚠️ Sync failed — check connection'; }
     else { el.innerHTML=''; }
   });
@@ -3875,7 +3875,7 @@ function choreCompleteReact(chore, m, result, evt) {
   const tiny = isTiny(m);
   if (!result.approved) {
     toast('Chore submitted! Waiting for parent approval ⏳');
-    if (tiny) speak('All done! Waiting for Mom or Dad to check!');
+    if (tiny) speak('All done! Waiting for Dad to check!');
     renderKidChores(); renderKidHeader(); renderKidNav();
   } else {
     if (tiny) {
