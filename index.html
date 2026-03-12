@@ -1179,7 +1179,7 @@
     @media (min-width: 768px) {
       .main-content     { max-width: 1080px; margin: 0 auto; padding-left: 24px; padding-right: 24px; }
       .app-header       { max-width: 1080px; margin: 0 auto; left: 50%; transform: translateX(-50%); width: calc(100% - 24px); position: sticky; }
-      .nav-bar          { max-width: 900px; left: 50%; right: auto; transform: translateX(-50%); border-radius: 24px; }
+      .nav-bar          { max-width: 900px; left: 50%; right: auto; width: calc(100% - 24px); transform: translateX(-50%); border-radius: 24px; }
       .prize-grid       { grid-template-columns: repeat(3, 1fr); }
       .stats-grid       { grid-template-columns: repeat(4, 1fr); }
       .pin-grid         { max-width: 280px; }
@@ -1278,6 +1278,58 @@
       50%       { border-color: var(--orange); box-shadow: 0 0 0 4px rgba(255,154,60,0.2); }
     }
     .pulse { animation: pulseBorder 2s infinite; }
+
+    /* ══════════════════════════════════════════
+       SLOT-MODE CHORE CARDS
+    ══════════════════════════════════════════ */
+    .chore-slots { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+    .chore-slot-row {
+      display: flex; align-items: center; gap: 10px;
+      background: #F9FAFB; border-radius: 10px; padding: 8px 10px;
+      border: 1px solid var(--border);
+    }
+    .chore-slot-label { flex: 1; font-size: 0.88rem; font-weight: 600; color: var(--text); }
+    .slot-status {
+      font-size: 1.1rem; min-width: 32px; text-align: center;
+    }
+    .slot-status.slot-done    { color: var(--green); }
+    .slot-status.slot-pending { color: var(--yellow); }
+    .slot-status.slot-waiting { color: var(--muted); }
+    .chore-slot-row .chore-btn { margin: 0; padding: 6px 14px; font-size: 0.82rem; }
+
+    /* Slot editor in chore modal */
+    .slot-editor { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+    .slot-editor-row {
+      display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; align-items: center;
+      background: #F9FAFB; border-radius: 12px; padding: 10px; border: 1px solid var(--border);
+    }
+    .slot-editor-row input[type=text]  { font-size: 0.9rem; padding: 8px 10px; }
+    .slot-editor-row input[type=time]  { font-size: 0.9rem; padding: 8px 6px; width: 108px; }
+    .slot-remove-btn {
+      border: none; background: #FEE2E2; color: #DC2626; border-radius: 8px;
+      padding: 6px 10px; cursor: pointer; font-size: 1rem; line-height: 1;
+    }
+
+    /* Photo capture */
+    .photo-preview-wrap {
+      background: #F9FAFB; border: 2px dashed var(--border); border-radius: 14px;
+      padding: 20px; text-align: center; cursor: pointer; margin-bottom: 12px;
+      transition: border-color 0.2s;
+    }
+    .photo-preview-wrap:hover { border-color: var(--purple); }
+    .photo-preview-wrap img   { max-width: 100%; max-height: 260px; border-radius: 10px; }
+    .photo-approval-thumb {
+      width: 72px; height: 72px; object-fit: cover; border-radius: 10px;
+      cursor: pointer; border: 2px solid var(--border); margin-top: 8px;
+    }
+
+    /* Icon search */
+    .icon-search-input {
+      width: 100%; padding: 9px 14px; border: 1.5px solid var(--border);
+      border-radius: 10px; font-size: 0.95rem; font-family: inherit;
+      margin-bottom: 10px;
+    }
+    .icon-search-input:focus { outline: none; border-color: var(--purple); }
   </style>
 </head>
 <body>
@@ -1332,6 +1384,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
 
   <script>
 /* ═══════════════════════════════════════════════════════════════
@@ -1350,8 +1403,9 @@ const FIREBASE_CONFIG = {
 const FAMILY_DOC = 'families/collum';
 
 firebase.initializeApp(FIREBASE_CONFIG);
-const auth = firebase.auth();
-const db   = firebase.firestore();
+const auth    = firebase.auth();
+const db      = firebase.firestore();
+const storage = firebase.storage();
 const APP_UNLOCK_KEY = 'familyHub.appUnlocked';
 const CURRENT_USER_KEY = 'familyHub.currentUserId';
 
@@ -1426,10 +1480,150 @@ const AVATARS = ['🦁','🐯','🐻','🐼','🦊','🐰','🐸','🐨','🦄',
 const COLORS  = ['#6C63FF','#FF6584','#43D9AD','#FFD93D','#6BCB77',
                  '#FF9A3C','#4ECDC4','#45B7D1','#E91E63','#9C27B0'];
 
-const CHORE_ICONS = ['🛏️','🧸','🦷','🍽️','🧹','🐾','📚','👕','🗑️',
-                     '🌿','🧴','🚿','🪣','🍳','🛒','📦','🧺','🪴',
-                     '🐕','🐱','🧽','🪥','🚽','🌙','🏠','🪞','🧲','🎒','🖼️','🛁'];
+// Unified emoji map used for both chore and prize icon pickers (with search)
+const EMOJI_MAP = [
+  // Bedroom / Sleep
+  {e:'🛏️',k:'bed bedroom sleep make morning'},
+  {e:'💤',k:'sleep nap rest night'},
+  {e:'🌙',k:'night sleep bedtime moon'},
+  {e:'🌅',k:'morning sunrise wake up'},
+  {e:'☀️',k:'morning sun wake up day'},
+  // Hygiene
+  {e:'🦷',k:'teeth brush dental hygiene morning'},
+  {e:'🪥',k:'toothbrush brush teeth'},
+  {e:'🚿',k:'shower bath wash hygiene'},
+  {e:'🛁',k:'bath tub soak wash clean'},
+  {e:'🧴',k:'lotion shampoo soap body wash'},
+  {e:'🧼',k:'soap wash hands clean hygiene'},
+  {e:'🪒',k:'shave razor face wash'},
+  {e:'💊',k:'medicine vitamin pill health'},
+  // Kitchen / Dishes
+  {e:'🍽️',k:'dishes plate table set clear dinner'},
+  {e:'🥄',k:'spoon silverware cutlery dishes'},
+  {e:'🍳',k:'cook cooking breakfast eggs pan'},
+  {e:'🧑‍🍳',k:'cook chef kitchen prepare'},
+  {e:'🥘',k:'cook meal dinner pot'},
+  {e:'🥗',k:'salad healthy food prep'},
+  {e:'🥞',k:'breakfast pancake morning'},
+  {e:'🥣',k:'cereal breakfast bowl morning'},
+  {e:'🍵',k:'tea hot drink morning'},
+  {e:'☕',k:'coffee tea morning drink'},
+  {e:'🫙',k:'jar pantry organize kitchen storage'},
+  {e:'♻️',k:'recycle sort separate'},
+  {e:'🗑️',k:'trash garbage bin empty take out'},
+  // Cleaning
+  {e:'🧹',k:'broom sweep floor clean'},
+  {e:'🧺',k:'laundry clothes wash basket hamper'},
+  {e:'🪣',k:'bucket mop clean floor'},
+  {e:'🧽',k:'sponge scrub clean dishes kitchen'},
+  {e:'🫧',k:'bubbles clean soap wash'},
+  {e:'🧻',k:'toilet paper bathroom'},
+  {e:'🪠',k:'plunger toilet clean'},
+  {e:'🚰',k:'faucet sink clean bathroom'},
+  {e:'🪟',k:'window clean house wipe'},
+  {e:'🪞',k:'mirror clean bathroom wipe'},
+  // Clothes / Laundry
+  {e:'👕',k:'shirt clothes laundry fold put away'},
+  {e:'🧦',k:'socks clothes laundry fold'},
+  {e:'👗',k:'dress clothes laundry fold'},
+  {e:'👖',k:'pants jeans clothes laundry'},
+  {e:'🧤',k:'gloves clothes winter'},
+  {e:'🎒',k:'backpack bag school pack unpack'},
+  // Garden / Outdoors
+  {e:'🌿',k:'plant water garden outdoor nature'},
+  {e:'🪴',k:'plant pot indoor water care'},
+  {e:'🌺',k:'flower plant garden tend'},
+  {e:'🌱',k:'seedling garden plant grow water'},
+  {e:'🌻',k:'sunflower garden outdoor'},
+  {e:'🍃',k:'leaf rake yard garden'},
+  {e:'🌾',k:'yard garden outdoor nature'},
+  // Pets
+  {e:'🐾',k:'pet dog cat feed walk animal'},
+  {e:'🐕',k:'dog pet walk feed'},
+  {e:'🐱',k:'cat pet feed indoor'},
+  {e:'🐟',k:'fish pet feed tank aquarium'},
+  {e:'🐠',k:'fish pet aquarium tank'},
+  {e:'🐇',k:'rabbit bunny pet hutch'},
+  // School / Study
+  {e:'📚',k:'books homework study school learn read'},
+  {e:'📖',k:'book read study homework'},
+  {e:'✏️',k:'pencil write homework school'},
+  {e:'📝',k:'write notes homework school list'},
+  {e:'📐',k:'ruler math school project'},
+  {e:'🖊️',k:'pen write homework assignment'},
+  {e:'🗓️',k:'calendar schedule plan agenda'},
+  // Organization
+  {e:'📦',k:'box pack organize room'},
+  {e:'🗂️',k:'folder organize files sort'},
+  {e:'📋',k:'clipboard list chore task check'},
+  {e:'🧲',k:'organize collect pick up'},
+  // House
+  {e:'🏠',k:'house home clean room tidy'},
+  {e:'🚪',k:'door house lock unlock'},
+  {e:'🛋️',k:'sofa couch living room tidy'},
+  {e:'🪑',k:'chair furniture tidy push in'},
+  {e:'🚽',k:'toilet clean bathroom scrub'},
+  {e:'🔑',k:'key lock secure house'},
+  {e:'💡',k:'light lamp electricity switch off'},
+  // Shopping / Errands
+  {e:'🛒',k:'grocery shopping cart errands store'},
+  {e:'🛍️',k:'bag shopping errands carry'},
+  {e:'📮',k:'mail post check mailbox'},
+  // Exercise / Health
+  {e:'🏃',k:'run jog exercise walk outdoor'},
+  {e:'🚴',k:'bike ride exercise outdoor'},
+  {e:'🏊',k:'swim pool exercise sport'},
+  {e:'⚽',k:'soccer ball sport exercise play'},
+  {e:'🏀',k:'basketball sport exercise play'},
+  {e:'💪',k:'exercise strong workout gym'},
+  {e:'🧘',k:'yoga meditation relax stretch'},
+  {e:'🚶',k:'walk dog exercise outdoor stroll'},
+  // Prizes & Rewards
+  {e:'🎬',k:'movie cinema film watch night'},
+  {e:'📱',k:'phone screen time device tablet'},
+  {e:'🍕',k:'pizza dinner choose food'},
+  {e:'🎁',k:'gift present toy surprise reward'},
+  {e:'🍦',k:'ice cream dessert treat sweet'},
+  {e:'🎮',k:'game video gaming play console'},
+  {e:'🎡',k:'amusement park ride fun fair'},
+  {e:'🛍️',k:'shopping mall trip store'},
+  {e:'🎪',k:'carnival fair amusement fun'},
+  {e:'🏖️',k:'beach swim vacation trip'},
+  {e:'🎳',k:'bowling night out fun'},
+  {e:'🍿',k:'popcorn movie night snack'},
+  {e:'🎵',k:'music concert show live'},
+  {e:'🧁',k:'cupcake cake bake birthday treat'},
+  {e:'🧩',k:'puzzle game play fun activity'},
+  {e:'🪁',k:'toy slingshot outside play'},
+  {e:'🚲',k:'bike ride trip outdoor fun'},
+  {e:'🎤',k:'karaoke sing music fun'},
+  {e:'🎯',k:'goal target aim game fun'},
+  {e:'⛸️',k:'skating ice rink fun winter'},
+  {e:'🏄',k:'surf beach water sport outdoor'},
+  {e:'🎠',k:'carousel fun fair amusement park'},
+  {e:'🎭',k:'theater show performance night out'},
+  {e:'🎨',k:'art craft paint create make'},
+  // Achievements
+  {e:'🏆',k:'trophy win award achievement champ'},
+  {e:'⭐',k:'star award achievement great job'},
+  {e:'🥇',k:'gold first place win achievement'},
+  {e:'🎖️',k:'medal award badge honor'},
+  {e:'👑',k:'crown royal best champion'},
+  // Fun misc
+  {e:'🎀',k:'ribbon gift bow award'},
+  {e:'🌈',k:'rainbow colorful fun happy'},
+  {e:'🎈',k:'balloon birthday party celebrate'},
+  {e:'🎉',k:'party celebrate confetti fun'},
+  {e:'🤝',k:'help teamwork cooperation family'},
+  {e:'❤️',k:'love care family kind'},
+  {e:'🌟',k:'star shine amazing great'},
+  {e:'🔧',k:'fix repair tool maintain'},
+  {e:'📦',k:'box organize pack storage room'},
+  {e:'🏡',k:'home house family outside yard'},
+];
 
+// Keep legacy arrays for backward compat (prize modal still uses PRIZE_ICONS)
+const CHORE_ICONS = EMOJI_MAP.map(e => e.e);
 const PRIZE_ICONS = ['🎬','📱','🌙','🍕','🎁','🍦','🎮','🎡','🛍️',
                      '🎪','🎠','🏖️','🎭','🎨','🎳','🍿','🎵','🧁',
                      '🧩','🪁','🚲','🏊','🎤','🎯','⛸️','🏄'];
@@ -1539,6 +1733,46 @@ async function pushToFirestore() {
   }
 }
 
+function getPendingEntryKeys(data, memberId) {
+  const keys = new Set();
+  if (!memberId || !data?.chores) return keys;
+  data.chores.forEach(chore => {
+    normalizeCompletionEntries(chore.completions?.[memberId]).forEach(e => {
+      if (e.status === 'pending') keys.add(`${chore.id}:${e.id}`);
+    });
+  });
+  return keys;
+}
+
+function checkForApprovalCelebration(prevPendingKeys, member) {
+  let totalNewPoints = 0;
+  const approvedChores = [];
+  D.chores.forEach(chore => {
+    normalizeCompletionEntries(chore.completions?.[member.id]).forEach(e => {
+      if (prevPendingKeys.has(`${chore.id}:${e.id}`) && e.status === 'done') {
+        totalNewPoints += chore.points;
+        if (!approvedChores.find(c => c.id === chore.id)) approvedChores.push(chore);
+      }
+    });
+  });
+  if (totalNewPoints <= 0) return;
+  // Update S.currentUser points from fresh data
+  const fresh = getMember(member.id);
+  if (fresh) S.currentUser = fresh;
+  const tiny = isTiny(member);
+  const subLine = approvedChores.length === 1
+    ? `"${approvedChores[0].title}" approved!`
+    : `${approvedChores.length} chores approved!`;
+  showCelebration({
+    icon:   approvedChores[0]?.icon || '⭐',
+    title:  tiny ? '🎉 Your parent said YES!' : '✅ Chore Approved!',
+    sub:    subLine,
+    points: totalNewPoints,
+    tts:    tiny ? `Amazing! Your parent approved your chore! You earned ${totalNewPoints} stars!` : null,
+    onClose: () => { renderKidChores(); renderKidHeader(); renderKidNav(); },
+  });
+}
+
 function subscribeToFirestore(onFirstLoad) {
   if (firestoreUnsub) firestoreUnsub();
   let firstSnapshot = true;
@@ -1547,8 +1781,14 @@ function subscribeToFirestore(onFirstLoad) {
       const incoming = snap.data();
       const normalizedIncoming = normalizeData(incoming);
       if (JSON.stringify(normalizedIncoming) !== JSON.stringify(D)) {
+        // Capture what was pending before the update (for approval celebration)
+        const prevPending = S.currentUser ? getPendingEntryKeys(D, S.currentUser.id) : new Set();
         D = normalizedIncoming;
         try { localStorage.setItem(LS_KEY, JSON.stringify(D)); } catch(e) {}
+        // Trigger celebration if kid is viewing and chores got approved
+        if (!firstSnapshot && prevPending.size > 0 && S.currentUser?.role === 'kid') {
+          checkForApprovalCelebration(prevPending, S.currentUser);
+        }
       }
     }
     S.syncStatus = 'ok';
@@ -1563,7 +1803,6 @@ function subscribeToFirestore(onFirstLoad) {
     S.syncStatus = 'error';
     updateSyncBar();
     console.warn('Firestore listener error:', err);
-    // If first load fails fall back to whatever is in localStorage
     if (firstSnapshot) {
       firstSnapshot = false;
       if (typeof onFirstLoad === 'function') onFirstLoad();
@@ -1637,6 +1876,8 @@ function normalizeCompletionEntry(entry) {
     status: entry?.status === 'pending' ? 'pending' : 'done',
     date: entry?.date || today(),
     createdAt: entry?.createdAt || Date.now(),
+    slotId:   entry?.slotId   || null,
+    photoUrl: entry?.photoUrl || null,
   };
 }
 
@@ -1646,6 +1887,16 @@ function normalizeCompletionEntries(value) {
     return [normalizeCompletionEntry(value)];
   }
   return [];
+}
+
+function normalizeSlots(slots) {
+  if (!Array.isArray(slots) || slots.length === 0) return null;
+  return slots.map(s => ({
+    id:    s.id    || genId(),
+    label: s.label || '',
+    start: typeof s.start === 'string' ? s.start : '',
+    end:   typeof s.end   === 'string' ? s.end   : '',
+  }));
 }
 
 function normalizeChore(chore) {
@@ -1666,6 +1917,7 @@ function normalizeChore(chore) {
     const end = typeof sourceWindows[key]?.end === 'string' ? sourceWindows[key].end : '';
     if (start || end) windows[day] = { start, end };
   });
+  const slots = normalizeSlots(schedule.slots);
 
   const completions = {};
   Object.entries(chore?.completions || {}).forEach(([memberId, entries]) => {
@@ -1676,6 +1928,7 @@ function normalizeChore(chore) {
     ...chore,
     frequency: period,
     repeatCount: targetCount,
+    requiresPhoto: chore?.requiresPhoto === true,
     assignedTo: Array.isArray(chore?.assignedTo) ? chore.assignedTo : [],
     description: chore?.description || '',
     completions,
@@ -1684,6 +1937,7 @@ function normalizeChore(chore) {
       targetCount,
       daysOfWeek: period === 'once' ? [] : daysOfWeek,
       windows,
+      slots,
     },
   };
 }
@@ -1739,6 +1993,11 @@ function isWithinTimeWindow(window, minutes) {
 function choreScheduleSummary(chore) {
   const schedule = getChoreSchedule(chore);
   if (schedule.period === 'once') return 'one-time';
+  if (schedule.slots && schedule.slots.length > 0) {
+    const countLabel = `${schedule.slots.length}x per day`;
+    const slotLabels = schedule.slots.map(s => s.label || formatTimeWindow({start:s.start, end:s.end})).join(' & ');
+    return `${countLabel} · ${formatDaysOfWeek(schedule.daysOfWeek)} · ${slotLabels}`;
+  }
   const countLabel = schedule.period === 'week'
     ? `${schedule.targetCount}x per week`
     : `${schedule.targetCount}x per day`;
@@ -1764,14 +2023,61 @@ function getRelevantCompletionEntries(chore, memberId, dateStr = today()) {
 
 function getChoreProgress(chore, memberId, dateStr = today()) {
   const schedule = getChoreSchedule(chore);
+  const allEntries = normalizeCompletionEntries(chore?.completions?.[memberId]);
+  const dayIndex = parseDateLocal(dateStr).getDay();
+  const now = nowMinutes();
+
+  // ── SLOT MODE ──────────────────────────────────────────────
+  if (schedule.slots && schedule.slots.length > 0 && schedule.period !== 'once') {
+    const scheduledToday = schedule.daysOfWeek.includes(dayIndex);
+    if (!scheduledToday) {
+      return {
+        schedule, entries: allEntries, isSlotMode: true,
+        doneCount: 0, pendingCount: 0, completedCount: 0,
+        targetCount: 0, remainingCount: 0,
+        scheduledToday: false, availableNow: false,
+        window: null, status: 'unavailable', availabilityText: `Available on ${formatDaysOfWeek(schedule.daysOfWeek)}`,
+        canSubmit: false, slotStatuses: [],
+      };
+    }
+    const todayEntries = allEntries.filter(e => e.date === dateStr);
+    const slotStatuses = schedule.slots.map(slot => {
+      const entry = todayEntries.find(e => e.slotId === slot.id);
+      const inWindow = isWithinTimeWindow({start: slot.start, end: slot.end}, now);
+      let slotStatus;
+      if (entry?.status === 'done')    slotStatus = 'done';
+      else if (entry?.status === 'pending') slotStatus = 'pending';
+      else if (inWindow)               slotStatus = 'available';
+      else                             slotStatus = 'waiting';
+      return { slot, entry, inWindow, status: slotStatus };
+    });
+    const doneCount      = slotStatuses.filter(s => s.status === 'done').length;
+    const pendingCount   = slotStatuses.filter(s => s.status === 'pending').length;
+    const completedCount = doneCount + pendingCount;
+    const targetCount    = schedule.slots.length;
+    const canSubmit      = slotStatuses.some(s => s.status === 'available');
+    let status = doneCount >= targetCount ? 'done'
+      : pendingCount > 0 && completedCount >= targetCount ? 'pending'
+      : completedCount > 0 ? 'partial'
+      : 'none';
+    return {
+      schedule, entries: allEntries, isSlotMode: true,
+      doneCount, pendingCount, completedCount, targetCount,
+      remainingCount: Math.max(0, targetCount - completedCount),
+      scheduledToday: true, availableNow: canSubmit,
+      window: null, status, availabilityText: '',
+      canSubmit, slotStatuses,
+    };
+  }
+
+  // ── STANDARD MODE ──────────────────────────────────────────
   const entries = getRelevantCompletionEntries(chore, memberId, dateStr);
   const doneCount = entries.filter(entry => entry.status === 'done').length;
   const pendingCount = entries.filter(entry => entry.status === 'pending').length;
   const completedCount = doneCount + pendingCount;
-  const dayIndex = parseDateLocal(dateStr).getDay();
   const scheduledToday = schedule.period === 'once' ? true : schedule.daysOfWeek.includes(dayIndex);
   const window = getChoreTimeWindow(chore, dayIndex);
-  const availableNow = schedule.period === 'once' ? true : scheduledToday && isWithinTimeWindow(window, nowMinutes());
+  const availableNow = schedule.period === 'once' ? true : scheduledToday && isWithinTimeWindow(window, now);
   const targetCount = schedule.period === 'once' ? 1 : (scheduledToday ? schedule.targetCount : 0);
   const remainingCount = Math.max(0, targetCount - completedCount);
   let status = 'none';
@@ -1792,24 +2098,13 @@ function getChoreProgress(chore, memberId, dateStr = today()) {
   } else {
     status = 'none';
   }
-
   if (!availabilityText && schedule.period !== 'once' && !availableNow) {
     availabilityText = `Available ${formatTimeWindow(window)}`;
   }
-
   return {
-    schedule,
-    entries,
-    doneCount,
-    pendingCount,
-    completedCount,
-    targetCount,
-    remainingCount,
-    scheduledToday,
-    availableNow,
-    window,
-    status,
-    availabilityText,
+    schedule, entries, isSlotMode: false,
+    doneCount, pendingCount, completedCount, targetCount, remainingCount,
+    scheduledToday, availableNow, window, status, availabilityText,
     canSubmit: schedule.period === 'once'
       ? completedCount < 1
       : scheduledToday && availableNow && remainingCount > 0,
@@ -1860,14 +2155,24 @@ function choreStatus(chore, memberId) {
   return getChoreProgress(chore, memberId).status;
 }
 
-function doCompleteChore(choreId, memberId) {
+function doCompleteChore(choreId, memberId, slotId = null, photoUrl = null) {
   const chore  = D.chores.find(c => c.id === choreId);
   const member = getMember(memberId);
   if (!chore || !member) return null;
   const progress = getChoreProgress(chore, memberId);
-  if (!progress.canSubmit) {
-    return { error: progress.remainingCount === 0 ? 'This chore is already fully submitted for now.' : (progress.availabilityText || 'This chore is not available right now.') };
+
+  if (progress.isSlotMode) {
+    const slotStatus = progress.slotStatuses?.find(s => s.slot.id === slotId);
+    if (!slotStatus) return { error: 'Slot not found.' };
+    if (slotStatus.status === 'done')    return { error: 'Already done for this time!' };
+    if (slotStatus.status === 'pending') return { error: 'Already submitted — waiting for approval.' };
+    if (slotStatus.status === 'waiting') return { error: slotStatus.slot.start ? `Available ${formatTimeWindow({start:slotStatus.slot.start, end:slotStatus.slot.end})}` : 'Not available yet.' };
+  } else {
+    if (!progress.canSubmit) {
+      return { error: progress.remainingCount === 0 ? 'This chore is already fully submitted for now.' : (progress.availabilityText || 'This chore is not available right now.') };
+    }
   }
+
   if (!chore.completions) chore.completions = {};
   chore.completions[memberId] = normalizeCompletionEntries(chore.completions[memberId]);
 
@@ -1876,6 +2181,8 @@ function doCompleteChore(choreId, memberId) {
     status: D.settings.autoApprove ? 'done' : 'pending',
     date: today(),
     createdAt: Date.now(),
+    slotId:   slotId   || null,
+    photoUrl: photoUrl || null,
   };
   chore.completions[memberId].push(completion);
 
@@ -2747,12 +3054,41 @@ function renderKidChores() {
 }
 
 function normalChoreCard(chore, member, progress) {
+  // Slot mode: show per-slot rows inside the card
+  if (progress?.isSlotMode) {
+    const slotsHtml = (progress.slotStatuses || []).map(({slot, status: ss}) => {
+      const label = slot.label || formatTimeWindow({start:slot.start, end:slot.end});
+      let slotBtn;
+      if (ss === 'done')    slotBtn = `<span class="slot-status slot-done">✅</span>`;
+      else if (ss === 'pending') slotBtn = `<span class="slot-status slot-pending">⏳</span>`;
+      else if (ss === 'available') {
+        const btnLabel = chore.requiresPhoto ? '📷 Photo' : 'Done ✓';
+        slotBtn = `<button class="chore-btn chore-btn-do" onclick="kidCompleteChore('${chore.id}',event,'${slot.id}')">${btnLabel}</button>`;
+      } else {
+        const timeHint = slot.start ? formatTimeWindow({start:slot.start, end:slot.end}) : '';
+        slotBtn = `<span class="slot-status slot-waiting" title="${timeHint}">🕒</span>`;
+      }
+      return `<div class="chore-slot-row"><span class="chore-slot-label">${esc(label)}</span>${slotBtn}</div>`;
+    }).join('');
+    return `
+      <div class="chore-item ${progress.status}">
+        <span class="chore-icon">${chore.icon}</span>
+        <div class="chore-info">
+          <div class="chore-name">${esc(chore.title)}</div>
+          <div class="chore-meta">${fmtPts(chore.points)} per slot</div>
+          <div class="chore-slots">${slotsHtml}</div>
+        </div>
+      </div>`;
+  }
+
+  // Standard mode
   const status = progress?.status || 'none';
   const submitted = progress?.completedCount || 0;
   const target = progress?.targetCount || (status === 'done' ? progress?.doneCount || 1 : 0);
   let btnHtml = '';
   if (progress?.canSubmit) {
-    btnHtml = `<button class="chore-btn chore-btn-do" onclick="kidCompleteChore('${chore.id}',event)">${submitted>0?'Add one more ✓':'Done! ✓'}</button>`;
+    const btnLabel = chore.requiresPhoto ? '📷 Photo' : (submitted > 0 ? 'Add one more ✓' : 'Done! ✓');
+    btnHtml = `<button class="chore-btn chore-btn-do" onclick="kidCompleteChore('${chore.id}',event)">${btnLabel}</button>`;
   } else if (status==='pending' || status==='partial') {
     btnHtml = `<span class="chore-btn chore-btn-pending">⏳ Pending</span>`;
   } else if (status==='unavailable') {
@@ -2775,9 +3111,34 @@ function normalChoreCard(chore, member, progress) {
 function tinyChoreCard(chore, member, progress) {
   const status = progress?.status || 'none';
   const tts = `${chore.title}. Worth ${chore.points} stars!`;
+
+  if (progress?.isSlotMode) {
+    const slotsHtml = (progress.slotStatuses || []).map(({slot, status: ss}) => {
+      const label = slot.label || formatTimeWindow({start:slot.start, end:slot.end});
+      let slotBtn;
+      if (ss === 'done')         slotBtn = `<span class="chore-btn chore-btn-done" style="font-size:1rem">⭐ Done!</span>`;
+      else if (ss === 'pending') slotBtn = `<span class="chore-btn chore-btn-pending" style="font-size:1rem">⏳ Waiting...</span>`;
+      else if (ss === 'available') {
+        const lbl = chore.requiresPhoto ? '📷 Take Photo' : '✓ Done!';
+        slotBtn = `<button class="chore-btn chore-btn-do" onclick="kidCompleteChore('${chore.id}',event,'${slot.id}')" style="font-size:1.1rem;padding:12px 18px">${lbl}</button>`;
+      } else {
+        slotBtn = `<span class="chore-btn chore-btn-pending" style="font-size:1rem">🕒 Later</span>`;
+      }
+      return `<div class="chore-slot-row"><span class="chore-slot-label" style="font-size:1rem">${esc(label)}</span>${slotBtn}</div>`;
+    }).join('');
+    return `
+      <div class="chore-item ${status}" onclick="speak('${tts.replace(/'/g,"\\'")}')">
+        <span class="chore-icon" style="font-size:4rem">${chore.icon}</span>
+        <div class="chore-name" style="font-size:1.2rem">${esc(chore.title)}</div>
+        <div class="chore-meta">⭐ ${chore.points} stars per time</div>
+        <div class="chore-slots" style="width:100%">${slotsHtml}</div>
+      </div>`;
+  }
+
   let btnHtml = '';
   if (progress?.canSubmit) {
-    btnHtml = `<button class="chore-btn chore-btn-do" onclick="kidCompleteChore('${chore.id}',event)" style="font-size:1.2rem;padding:14px 20px">✓ ${progress.completedCount>0?'Again!':'Done!'}</button>`;
+    const lbl = chore.requiresPhoto ? '📷 Take Photo' : (progress.completedCount > 0 ? 'Again!' : 'Done!');
+    btnHtml = `<button class="chore-btn chore-btn-do" onclick="kidCompleteChore('${chore.id}',event)" style="font-size:1.2rem;padding:14px 20px">✓ ${lbl}</button>`;
   } else if (status==='pending' || status==='partial') {
     btnHtml = `<span class="chore-btn chore-btn-pending" style="font-size:1rem">⏳ Waiting...</span>`;
   } else if (status==='unavailable') {
@@ -2796,25 +3157,36 @@ function tinyChoreCard(chore, member, progress) {
     </div>`;
 }
 
-function kidCompleteChore(choreId, evt) {
+function kidCompleteChore(choreId, evt, slotId = null) {
   evt && evt.stopPropagation();
   const m = S.currentUser;
   if (!m) return;
-  const result = doCompleteChore(choreId, m.id);
+  const chore = D.chores.find(c=>c.id===choreId);
+  if (!chore) return;
+
+  // Photo required — open capture modal first
+  if (chore.requiresPhoto) {
+    showPhotoCapture(choreId, slotId);
+    return;
+  }
+
+  const result = doCompleteChore(choreId, m.id, slotId);
   if (!result) return;
   if (result.error) {
     toast(result.error);
     if (isTiny(m)) speak(result.error);
     return;
   }
+  choreCompleteReact(chore, m, result, evt);
+}
 
-  const chore = D.chores.find(c=>c.id===choreId);
+function choreCompleteReact(chore, m, result, evt) {
+  const tiny = isTiny(m);
   if (!result.approved) {
     toast('Chore submitted! Waiting for parent approval ⏳');
-    if (isTiny(m)) speak('All done! Waiting for Mom or Dad to check!');
+    if (tiny) speak('All done! Waiting for Mom or Dad to check!');
+    renderKidChores(); renderKidHeader(); renderKidNav();
   } else {
-    // Show celebration
-    const tiny = isTiny(m);
     if (tiny) {
       showCelebration({
         icon: chore?.icon||'⭐',
@@ -2825,17 +3197,112 @@ function kidCompleteChore(choreId, evt) {
         onClose: () => { renderKidChores(); renderKidHeader(); }
       });
     } else {
-      // Subtle points burst
       if (evt) {
         const rect = evt.target.getBoundingClientRect();
         pointsBurst(rect.left + rect.width/2, rect.top, chore?.points||0);
       }
       toast(`+${chore?.points} pts! Great work! ⭐`);
-      renderKidChores();
-      renderKidHeader();
+      renderKidChores(); renderKidHeader();
     }
+    renderKidNav();
   }
-  renderKidNav();
+}
+
+// ── PHOTO CAPTURE ─────────────────────────────────────────────
+function showPhotoCapture(choreId, slotId) {
+  const chore = D.chores.find(c => c.id === choreId);
+  showModal(`
+    <div class="modal-title">📷 Take a Photo</div>
+    <p style="color:var(--muted);font-size:0.9rem;margin-bottom:14px">
+      Show you completed: <strong>${esc(chore?.title||'')}</strong>
+    </p>
+    <div class="photo-preview-wrap" id="photo-drop-zone" onclick="document.getElementById('photo-file-input').click()">
+      <img id="photo-preview-img" src="" alt="" style="display:none">
+      <div id="photo-drop-hint" style="color:var(--muted);font-size:2rem;padding:20px 0">
+        📷<br><span style="font-size:0.95rem">Tap to take photo or choose image</span>
+      </div>
+    </div>
+    <input type="file" id="photo-file-input" accept="image/*" capture="environment" style="display:none" onchange="previewChorePhoto(event)">
+    <div class="modal-actions" style="flex-direction:column;gap:10px">
+      <button class="btn btn-primary" id="photo-submit-btn" style="opacity:0.4;pointer-events:none" onclick="submitChorePhoto('${choreId}','${slotId||''}')">Submit Photo ✓</button>
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+    </div>`);
+}
+
+function previewChorePhoto(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img  = document.getElementById('photo-preview-img');
+    const hint = document.getElementById('photo-drop-hint');
+    const btn  = document.getElementById('photo-submit-btn');
+    img.src = e.target.result;
+    img.style.display = 'block';
+    if (hint) hint.style.display = 'none';
+    if (btn)  { btn.style.opacity = '1'; btn.style.pointerEvents = 'auto'; }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function submitChorePhoto(choreId, slotId) {
+  const input = document.getElementById('photo-file-input');
+  const file  = input?.files[0];
+  if (!file) { toast('Please take a photo first'); return; }
+  const btn = document.getElementById('photo-submit-btn');
+  if (btn) { btn.style.opacity = '0.5'; btn.style.pointerEvents = 'none'; btn.textContent = 'Uploading…'; }
+  try {
+    const photoUrl = await uploadChorePhoto(file);
+    closeModal();
+    const m = S.currentUser;
+    const result = doCompleteChore(choreId, m.id, slotId || null, photoUrl);
+    if (!result) return;
+    if (result.error) { toast(result.error); return; }
+    const chore = D.chores.find(c => c.id === choreId);
+    choreCompleteReact(chore, m, result, null);
+  } catch(e) {
+    console.warn('Photo upload failed:', e);
+    toast('Upload failed — check your connection and try again.');
+    if (btn) { btn.style.opacity = '1'; btn.style.pointerEvents = 'auto'; btn.textContent = 'Submit Photo ✓'; }
+  }
+}
+
+async function uploadChorePhoto(file) {
+  const compressed = await compressImage(file, 800, 0.75);
+  const path = `chore-photos/${FAMILY_DOC.replace('/','_')}/${Date.now()}_${genId()}.jpg`;
+  const ref  = storage.ref(path);
+  await ref.put(compressed, { contentType: 'image/jpeg' });
+  return ref.getDownloadURL();
+}
+
+function compressImage(file, maxPx, quality) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      if (w > maxPx || h > maxPx) {
+        if (w > h) { h = Math.round(h * maxPx / w); w = maxPx; }
+        else       { w = Math.round(w * maxPx / h); h = maxPx; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Canvas toBlob failed')), 'image/jpeg', quality);
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+function viewPhoto(url) {
+  showModal(`
+    <div class="modal-title">📷 Chore Photo</div>
+    <img src="${url}" alt="Chore photo" style="width:100%;border-radius:12px;margin-bottom:16px;display:block">
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeModal()">Close</button>
+    </div>`);
 }
 
 // ── POINTS TAB (8yo) ──────────────────────────────────────────
@@ -3239,14 +3706,20 @@ function renderParentHome() {
     pending.forEach(({chore, memberId, entry}) => {
       const mem = getMember(memberId);
       if (!mem) return;
+      const slotLabel = entry.slotId && chore.schedule?.slots
+        ? (chore.schedule.slots.find(s=>s.id===entry.slotId)?.label || '') : '';
+      const photoHtml = entry.photoUrl
+        ? `<img src="${entry.photoUrl}" class="photo-approval-thumb" onclick="viewPhoto('${entry.photoUrl}')" alt="Photo" title="Click to view full size">`
+        : '';
       html += `
-        <div class="admin-card">
+        <div class="admin-card" style="flex-wrap:wrap;gap:10px">
           <span class="admin-icon">${chore.icon}</span>
-          <div class="admin-info">
-            <div class="admin-name">${esc(chore.title)}</div>
+          <div class="admin-info" style="flex:1;min-width:0">
+            <div class="admin-name">${esc(chore.title)}${slotLabel?` <span style="font-size:0.8rem;color:var(--muted)">(${esc(slotLabel)})</span>`:''}</div>
             <div class="admin-meta">${mem.avatar} ${esc(mem.name)} · +${chore.points} pts · ${fmtDate(entry.date)}</div>
+            ${photoHtml}
           </div>
-          <div class="admin-actions">
+          <div class="admin-actions" style="align-self:flex-start">
             <button class="btn-icon-sm btn-icon-approve" onclick="approveChore('${chore.id}','${memberId}','${entry.id}')">✓</button>
             <button class="btn-icon-sm btn-icon-reject"  onclick="rejectChore('${chore.id}','${memberId}','${entry.id}')">✕</button>
           </div>
@@ -3387,27 +3860,35 @@ function renderParentChores() {
   document.getElementById('parent-content').innerHTML = html;
 }
 
+// Ephemeral slot state while modal is open
+let _editSlots = [];
+
 function showChoreModal(choreId) {
   const kids  = D.family.members.filter(m=>m.role==='kid');
   const chore = choreId ? D.chores.find(c=>c.id===choreId) : null;
   const c     = normalizeChore(chore || {
     title:'', icon:'🛏️', points:10, frequency:'day', repeatCount:1,
-    schedule: { period:'day', targetCount:1, daysOfWeek:ALL_DAYS.slice(), windows:{} },
+    schedule: { period:'day', targetCount:1, daysOfWeek:ALL_DAYS.slice(), windows:{}, slots:null },
     assignedTo:kids.map(k=>k.id), description:'', completions:{}
   });
 
-  const iconOpts = CHORE_ICONS.map(ic =>
+  // Init slot editor state from existing chore
+  _editSlots = c.schedule.slots ? c.schedule.slots.map(s=>({...s})) : [];
+
+  const iconOpts = EMOJI_MAP.slice(0, 48).map(({e:ic}) =>
     `<div class="icon-opt${ic===c.icon?' sel':''}" onclick="selChoreIcon(this,'${ic}')">${ic}</div>`
   ).join('');
+
   const assignOpts = kids.map(k => `
     <label class="chore-checkbox-row">
       <input type="checkbox" name="assign" value="${k.id}" ${c.assignedTo?.includes(k.id)?'checked':''}>
       <span class="chore-checkbox-icon">${k.avatar}</span>
       <span class="chore-checkbox-label">${esc(k.name)}</span>
     </label>`).join('');
+
   const scheduleRows = WEEKDAY_OPTIONS.map(day => {
     const checked = c.schedule.period !== 'once' && c.schedule.daysOfWeek.includes(day.value);
-    const window = c.schedule.windows?.[day.value] || { start:'', end:'' };
+    const win = c.schedule.windows?.[day.value] || { start:'', end:'' };
     return `
       <div class="schedule-day-row">
         <label class="schedule-day-toggle">
@@ -3415,27 +3896,30 @@ function showChoreModal(choreId) {
           <span>${day.label}</span>
         </label>
         <div class="schedule-day-hours">
-          <input type="time" id="cm-start-${day.value}" value="${window.start||''}" ${checked?'':'disabled'}>
+          <input type="time" id="cm-start-${day.value}" value="${win.start||''}" ${checked?'':'disabled'}>
           <span>to</span>
-          <input type="time" id="cm-end-${day.value}" value="${window.end||''}" ${checked?'':'disabled'}>
+          <input type="time" id="cm-end-${day.value}" value="${win.end||''}" ${checked?'':'disabled'}>
         </div>
       </div>`;
   }).join('');
+
+  const hasSlots = _editSlots.length > 0;
 
   showModal(`
     <div class="modal-title">${chore?'Edit':'Add'} Chore</div>
     <input type="hidden" id="cm-icon" value="${c.icon}">
     <div class="form-group">
       <label class="form-label">Icon</label>
-      <div class="icon-picker">${iconOpts}</div>
+      <input type="text" class="icon-search-input" placeholder="🔍 Search icons (e.g. teeth, laundry, dog)..." oninput="filterIcons(this.value)">
+      <div class="icon-picker" id="icon-picker-grid">${iconOpts}</div>
     </div>
     <div class="form-group">
       <label class="form-label">Chore name</label>
-      <input type="text" id="cm-title" placeholder="e.g. Make Bed" value="${esc(c.title)}">
+      <input type="text" id="cm-title" placeholder="e.g. Brush Teeth" value="${esc(c.title)}">
     </div>
     <div class="input-row">
       <div class="form-group mb-0">
-        <label class="form-label">Points</label>
+        <label class="form-label">Points <span class="form-label-hint">${hasSlots?'per slot':'total'}</span></label>
         <input type="number" id="cm-points" min="1" max="500" value="${c.points}">
       </div>
       <div class="form-group mb-0">
@@ -3449,17 +3933,53 @@ function showChoreModal(choreId) {
     </div>
     <div id="cm-schedule-fields">
       <div class="form-group">
-        <label class="form-label">Required completions</label>
-        <input type="number" id="cm-repeat" min="1" max="12" value="${c.schedule.targetCount||1}">
-        <div class="schedule-help">Use this for chores that need to happen more than once in the same day or week.</div>
+        <label class="form-label">Completion style</label>
+        <div class="display-mode-row" style="grid-template-columns:1fr 1fr;margin-top:0">
+          <button class="mode-opt${!hasSlots?' sel':''}" id="cm-style-simple" onclick="setChoreStyle('simple')"><span class="mode-opt-icon">🔢</span>Simple count</button>
+          <button class="mode-opt${hasSlots?' sel':''}"  id="cm-style-slots"  onclick="setChoreStyle('slots')"><span class="mode-opt-icon">⏰</span>Timed slots</button>
+        </div>
+        <div class="schedule-help" style="margin-top:6px" id="cm-style-help">${hasSlots?'Each slot earns points independently when completed during its window.':'Kids must complete the chore a set number of times. All must be done before points are awarded.'}</div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Available days and hours</label>
-        <div class="schedule-help">Leave the times blank for any time on that day. You can set different hours for each day.</div>
-        <div class="schedule-day-grid">${scheduleRows}</div>
+      <div id="cm-simple-fields" style="display:${hasSlots?'none':'block'}">
+        <div class="form-group">
+          <label class="form-label">Required completions</label>
+          <input type="number" id="cm-repeat" min="1" max="12" value="${c.schedule.targetCount||1}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Available days and hours</label>
+          <div class="schedule-help">Leave times blank for any time on that day.</div>
+          <div class="schedule-day-grid">${scheduleRows}</div>
+        </div>
+      </div>
+      <div id="cm-slots-fields" style="display:${hasSlots?'block':'none'}">
+        <div class="form-group">
+          <label class="form-label">Available days</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px" id="cm-slot-days">
+            ${WEEKDAY_OPTIONS.map(day => {
+              const on = c.schedule.daysOfWeek.includes(day.value);
+              return `<label style="display:flex;align-items:center;gap:5px;font-weight:600;font-size:0.88rem">
+                <input type="checkbox" id="cm-sday-${day.value}" ${on?'checked':''}> ${day.label}
+              </label>`;
+            }).join('')}
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Time slots <span class="form-label-hint">each earns ${c.points} pts</span></label>
+          <div class="slot-editor" id="cm-slot-editor"></div>
+          <button class="btn btn-secondary btn-sm" style="margin-top:10px" onclick="addChoreSlot()">+ Add slot</button>
+        </div>
       </div>
     </div>
     ${kids.length>0?`<div class="form-group"><label class="form-label">Assign to</label>${assignOpts}</div>`:''}
+    <div class="form-group">
+      <label class="chore-checkbox-row" style="gap:12px">
+        <input type="checkbox" id="cm-photo" ${c.requiresPhoto?'checked':''}>
+        <div>
+          <div style="font-weight:700">📷 Require photo</div>
+          <div style="font-size:0.8rem;color:var(--muted)">Kid must snap a photo before submitting</div>
+        </div>
+      </label>
+    </div>
     <div class="form-group">
       <label class="form-label">Description <span class="form-label-hint">optional</span></label>
       <textarea id="cm-desc" placeholder="Any instructions...">${esc(c.description||'')}</textarea>
@@ -3468,13 +3988,70 @@ function showChoreModal(choreId) {
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveChore('${choreId||''}')">Save ✓</button>
     </div>`);
+
   toggleChoreScheduleFields();
+  renderSlotEditor();
+}
+
+function filterIcons(query) {
+  const q = query.toLowerCase().trim();
+  const matches = q ? EMOJI_MAP.filter(({k}) => k.includes(q)) : EMOJI_MAP.slice(0, 48);
+  const cur = document.getElementById('cm-icon')?.value;
+  const grid = document.getElementById('icon-picker-grid');
+  if (!grid) return;
+  if (matches.length === 0) {
+    grid.innerHTML = `<div style="color:var(--muted);font-size:0.85rem;padding:8px;grid-column:1/-1">No icons found — try different words.</div>`;
+    return;
+  }
+  grid.innerHTML = matches.slice(0, 60).map(({e:ic}) =>
+    `<div class="icon-opt${ic===cur?' sel':''}" onclick="selChoreIcon(this,'${ic}')">${ic}</div>`
+  ).join('');
 }
 
 function selChoreIcon(el, icon) {
   document.getElementById('cm-icon').value = icon;
-  el.closest('.icon-picker').querySelectorAll('.icon-opt').forEach(x=>x.classList.remove('sel'));
+  el.closest('#icon-picker-grid, .icon-picker').querySelectorAll('.icon-opt').forEach(x=>x.classList.remove('sel'));
   el.classList.add('sel');
+}
+
+function setChoreStyle(style) {
+  const isSlots = style === 'slots';
+  document.getElementById('cm-style-simple')?.classList.toggle('sel', !isSlots);
+  document.getElementById('cm-style-slots')?.classList.toggle('sel',  isSlots);
+  document.getElementById('cm-simple-fields').style.display = isSlots ? 'none' : 'block';
+  document.getElementById('cm-slots-fields').style.display  = isSlots ? 'block' : 'none';
+  document.getElementById('cm-style-help').textContent = isSlots
+    ? 'Each slot earns points independently when completed during its window.'
+    : 'Kids must complete the chore a set number of times. All must be done before points are awarded.';
+  if (isSlots && _editSlots.length === 0) {
+    _editSlots = [
+      { id: genId(), label: 'Morning', start: '06:00', end: '09:00' },
+      { id: genId(), label: 'Evening', start: '18:00', end: '21:00' },
+    ];
+    renderSlotEditor();
+  }
+}
+
+function renderSlotEditor() {
+  const container = document.getElementById('cm-slot-editor');
+  if (!container) return;
+  container.innerHTML = _editSlots.map((slot, i) => `
+    <div class="slot-editor-row">
+      <input type="text" placeholder="Label (e.g. Morning)" value="${esc(slot.label)}" oninput="_editSlots[${i}].label=this.value">
+      <input type="time" value="${slot.start}" oninput="_editSlots[${i}].start=this.value">
+      <input type="time" value="${slot.end}"   oninput="_editSlots[${i}].end=this.value">
+      <button class="slot-remove-btn" onclick="removeChoreSlot(${i})">✕</button>
+    </div>`).join('');
+}
+
+function addChoreSlot() {
+  _editSlots.push({ id: genId(), label: '', start: '', end: '' });
+  renderSlotEditor();
+}
+
+function removeChoreSlot(i) {
+  _editSlots.splice(i, 1);
+  renderSlotEditor();
 }
 
 function toggleChoreScheduleFields() {
@@ -3487,9 +4064,9 @@ function toggleChoreScheduleFields() {
 function toggleChoreDayRow(dayIndex) {
   const enabled = document.getElementById(`cm-day-${dayIndex}`)?.checked;
   const start = document.getElementById(`cm-start-${dayIndex}`);
-  const end = document.getElementById(`cm-end-${dayIndex}`);
+  const end   = document.getElementById(`cm-end-${dayIndex}`);
   if (start) start.disabled = !enabled;
-  if (end) end.disabled = !enabled;
+  if (end)   end.disabled   = !enabled;
 }
 
 function saveChore(choreId) {
@@ -3497,59 +4074,44 @@ function saveChore(choreId) {
   const icon   = document.getElementById('cm-icon')?.value || '📋';
   const points = parseInt(document.getElementById('cm-points')?.value)||10;
   const freq   = document.getElementById('cm-freq')?.value || 'day';
-  const repeatCount = Math.max(1, parseInt(document.getElementById('cm-repeat')?.value, 10) || 1);
+  const requiresPhoto = document.getElementById('cm-photo')?.checked === true;
   const desc   = document.getElementById('cm-desc')?.value.trim();
   const assigned = [...document.querySelectorAll('input[name=assign]:checked')].map(x=>x.value);
-  const daysOfWeek = freq === 'once' ? [] : WEEKDAY_OPTIONS.filter(day => document.getElementById(`cm-day-${day.value}`)?.checked).map(day => day.value);
-  const windows = {};
-
-  if (freq !== 'once' && daysOfWeek.length === 0) { toast('Select at least one day for this chore'); return; }
-  daysOfWeek.forEach(day => {
-    const start = document.getElementById(`cm-start-${day}`)?.value || '';
-    const end = document.getElementById(`cm-end-${day}`)?.value || '';
-    if (start || end) windows[day] = { start, end };
-  });
 
   if (!title) { toast('Enter a chore name'); return; }
 
+  // Determine if using slot mode or simple mode
+  const useSlots = document.getElementById('cm-slots-fields')?.style.display !== 'none' && _editSlots.length > 0;
+  let scheduleObj;
+
+  if (freq === 'once') {
+    scheduleObj = { period:'once', targetCount:1, daysOfWeek:[], windows:{}, slots:null };
+  } else if (useSlots) {
+    if (_editSlots.length === 0) { toast('Add at least one time slot'); return; }
+    const slotDays = WEEKDAY_OPTIONS.filter(d => document.getElementById(`cm-sday-${d.value}`)?.checked).map(d=>d.value);
+    if (slotDays.length === 0) { toast('Select at least one day'); return; }
+    scheduleObj = { period: freq, targetCount:1, daysOfWeek: slotDays, windows:{}, slots: _editSlots.map(s=>({...s})) };
+  } else {
+    const repeatCount = Math.max(1, parseInt(document.getElementById('cm-repeat')?.value, 10) || 1);
+    const daysOfWeek = WEEKDAY_OPTIONS.filter(d => document.getElementById(`cm-day-${d.value}`)?.checked).map(d=>d.value);
+    if (daysOfWeek.length === 0) { toast('Select at least one day for this chore'); return; }
+    const windows = {};
+    daysOfWeek.forEach(day => {
+      const start = document.getElementById(`cm-start-${day}`)?.value || '';
+      const end   = document.getElementById(`cm-end-${day}`)?.value   || '';
+      if (start || end) windows[day] = { start, end };
+    });
+    scheduleObj = { period: freq, targetCount: repeatCount, daysOfWeek, windows, slots:null };
+  }
+
+  const choreData = { title, icon, points, requiresPhoto, frequency: freq,
+    repeatCount: scheduleObj.targetCount, assignedTo: assigned, description: desc, schedule: scheduleObj };
+
   if (choreId) {
     const index = D.chores.findIndex(x=>x.id===choreId);
-    if (index >= 0) {
-      D.chores[index] = normalizeChore({
-        ...D.chores[index],
-        title,
-        icon,
-        points,
-        frequency: freq,
-        repeatCount,
-        assignedTo: assigned,
-        description: desc,
-        schedule: {
-          period: freq,
-          targetCount: repeatCount,
-          daysOfWeek,
-          windows,
-        },
-      });
-    }
+    if (index >= 0) D.chores[index] = normalizeChore({ ...D.chores[index], ...choreData });
   } else {
-    D.chores.push(normalizeChore({
-      id:genId(),
-      title,
-      icon,
-      points,
-      frequency:freq,
-      repeatCount,
-      assignedTo:assigned,
-      description:desc,
-      completions:{},
-      schedule: {
-        period: freq,
-        targetCount: repeatCount,
-        daysOfWeek,
-        windows,
-      },
-    }));
+    D.chores.push(normalizeChore({ id:genId(), completions:{}, ...choreData }));
   }
   saveData();
   closeModal();
@@ -4135,6 +4697,7 @@ function renderGrandmaHeader() {
   const m = S.currentUser;
   document.getElementById('grandma-header').innerHTML = `
     <div class="header-left">
+      <button class="btn-back" onclick="goHome()">←</button>
       <span class="header-avatar">${m?.avatar||'👵'}</span>
       <div>
         <div class="header-name">${esc(m?.name||'Grandma')}</div>
