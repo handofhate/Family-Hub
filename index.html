@@ -72,10 +72,10 @@
     }
     .profile-grid {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
       gap: 14px;
       width: 100%;
-      max-width: 420px;
+      max-width: 980px;
     }
     .profile-card {
       background: #fff;
@@ -132,6 +132,8 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
       padding: 14px 16px 10px;
       background: #fff;
       border-bottom: 1px solid var(--border);
@@ -139,10 +141,11 @@
       top: 0;
       z-index: 50;
     }
-    .header-left  { display: flex; align-items: center; gap: 10px; }
+    .header-left  { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-width: 0; }
+    .header-actions { display:flex; gap:8px; align-items:center; flex-shrink:0; }
     .header-avatar { font-size: 2rem; }
-    .header-name   { font-weight: 700; font-size: 1.05rem; }
-    .header-sub    { font-size: 0.75rem; color: var(--muted); }
+    .header-name   { font-weight: 700; font-size: 1.05rem; overflow-wrap:anywhere; }
+    .header-sub    { font-size: 0.75rem; color: var(--muted); overflow-wrap:anywhere; }
     .header-badge  {
       background: var(--yellow);
       color: var(--text);
@@ -220,6 +223,8 @@
       flex: 1;
       overflow-y: auto;
       padding: 16px 16px 100px;
+      width: min(100%, 1180px);
+      margin: 0 auto;
       -webkit-overflow-scrolling: touch;
     }
 
@@ -793,8 +798,31 @@
     }
     .setup-wrap {
       width: 100%;
-      max-width: 480px;
+      max-width: 980px;
       padding: 0 20px 40px;
+    }
+
+    @media (min-width: 768px) {
+      #screen-home { padding: 36px; }
+      .home-title { font-size: 2.6rem; }
+      .home-family-name { font-size: 1.2rem; }
+      .main-content { padding: 24px 28px 120px; }
+      .card { padding: 22px; }
+      .modal-overlay { align-items: center; padding: 24px; }
+      .modal {
+        border-radius: 24px;
+        max-width: 760px;
+        width: min(100%, 760px);
+        max-height: 90vh;
+        margin: 0 auto;
+      }
+      .pin-grid { max-width: 360px; gap: 12px; }
+      .pin-key { padding: 20px; font-size: 1.6rem; }
+    }
+
+    @media (min-width: 1100px) {
+      .profile-grid { max-width: 1100px; }
+      .stats-grid { grid-template-columns: repeat(4, 1fr); }
     }
     .setup-top {
       text-align: center;
@@ -1178,10 +1206,25 @@ const FAMILY_DOC = 'families/collum';
 firebase.initializeApp(FIREBASE_CONFIG);
 const auth = firebase.auth();
 const db   = firebase.firestore();
+const APP_UNLOCK_KEY = 'familyHub.appUnlocked';
+
+function setAppUnlocked(v) {
+  try { localStorage.setItem(APP_UNLOCK_KEY, v ? '1' : '0'); } catch (_) {}
+}
+
+function isAppUnlocked() {
+  try { return localStorage.getItem(APP_UNLOCK_KEY) === '1'; }
+  catch (_) { return false; }
+}
 
 // ── APP-LEVEL PIN GATE ────────────────────────────────────────
 function showAppPin() {
-  if (!D.settings || !D.settings.parentPin) { renderHome(); return; }
+  if (!D.settings || !D.settings.parentPin) {
+    setAppUnlocked(true);
+    renderHome();
+    return;
+  }
+  setAppUnlocked(false);
   showScreen('screen-pin');
   S.pinBuffer = '';
   S.pinMode   = 'app';
@@ -1617,6 +1660,24 @@ function closeModalIfBg(e) {
   if (e.target.id === 'modal-overlay') closeModal();
 }
 
+function openUserSettings() {
+  const name = S.currentUser?.name || 'User';
+  showModal(`
+    <div class="modal-title">⚙️ Settings</div>
+    <p style="color:var(--muted);font-size:0.95rem;margin-bottom:16px">
+      Signed in as <strong>${esc(name)}</strong>.
+    </p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+      <button class="btn btn-primary" onclick="switchUserNow()">Switch User</button>
+    </div>`);
+}
+
+function switchUserNow() {
+  closeModal();
+  goHome();
+}
+
 // ── SCREEN NAVIGATION ─────────────────────────────────────────
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -1692,7 +1753,7 @@ function renderHome() {
     <div class="home-logo" style="color:#fff;font-size:3.5rem;margin-top:20px">⭐</div>
     <div class="home-title">Family Hub</div>
     <div class="home-family-name">${esc(D.family.name)}</div>
-    <div class="profile-grid" style="max-width:420px;width:100%;padding:0 24px">${cards}</div>
+    <div class="profile-grid" style="max-width:980px;width:100%;padding:0 24px">${cards}</div>
     <button class="home-setup-btn mt-12" onclick="goSetup()">⚙️ Edit Family</button>
     <div style="height:24px"></div>`;
 }
@@ -1769,7 +1830,11 @@ function pinKey(k) {
     setTimeout(() => {
       if (S.pinBuffer === D.settings.parentPin) {
         S.pinBuffer = '';
-        if (S.pinMode === 'app') { renderHome(); return; }
+        if (S.pinMode === 'app') {
+          setAppUnlocked(true);
+          renderHome();
+          return;
+        }
         renderParentView();
       } else {
         S.pinBuffer = '';
@@ -2146,14 +2211,16 @@ function renderKidHeader() {
   const pts = m.points || 0;
   document.getElementById('kid-header').innerHTML = `
     <div class="header-left">
-      <button class="btn-back" onclick="goHome()">←</button>
       <span class="header-avatar">${m.avatar||'🙂'}</span>
       <div>
         <div class="header-name">Hi, ${esc(m.name)}!</div>
         <div class="header-sub">${todayDisplay()}</div>
       </div>
     </div>
-    <div class="header-badge">⭐ ${pts}</div>`;
+    <div class="header-actions">
+      <div class="header-badge">⭐ ${pts}</div>
+      <button class="btn-icon-sm" style="background:#F3F4F6" onclick="openUserSettings()" title="Settings">⚙️</button>
+    </div>`;
 }
 
 function renderKidNav() {
@@ -2668,16 +2735,16 @@ function renderParentHeader() {
   const pending = pendingApprovals().length;
   document.getElementById('parent-header').innerHTML = `
     <div class="header-left">
-      <button class="btn-back" onclick="goHome()">←</button>
       <span class="header-avatar">${m?.avatar||'🧑'}</span>
       <div>
         <div class="header-name">${esc(D.family.name)}</div>
         <div class="header-sub">Parent Dashboard</div>
       </div>
     </div>
-    <div style="display:flex;gap:8px;align-items:center">
+    <div class="header-actions">
       ${pending>0?`<span class="header-badge" style="background:#EF4444;color:#fff">⏳ ${pending}</span>`:''}
       <button class="btn-icon-sm" style="background:#EDE9FE;color:var(--purple)" onclick="pushToFirestore()" title="Sync now">☁️</button>
+      <button class="btn-icon-sm" style="background:#F3F4F6" onclick="openUserSettings()" title="Settings">⚙️</button>
     </div>`;
 }
 
@@ -3394,16 +3461,16 @@ function renderGrandmaHeader() {
   const m = S.currentUser;
   document.getElementById('grandma-header').innerHTML = `
     <div class="header-left">
-      <button class="btn-back" onclick="goHome()">←</button>
       <span class="header-avatar">${m?.avatar||'👵'}</span>
       <div>
         <div class="header-name">${esc(m?.name||'Grandma')}</div>
         <div class="header-sub">${todayDisplay()}</div>
       </div>
     </div>
-    <div style="display:flex;gap:6px;align-items:center">
+    <div class="header-actions">
       <button class="btn-icon-sm" style="background:#F3F4F6;font-size:1.2rem" onclick="grandmaFontUp()" title="Bigger text">A+</button>
       <button class="btn-icon-sm" style="background:#F3F4F6;font-size:0.85rem" onclick="grandmaFontDown()" title="Smaller text">A-</button>
+      <button class="btn-icon-sm" style="background:#F3F4F6" onclick="openUserSettings()" title="Settings">⚙️</button>
     </div>`;
 }
 
@@ -3615,7 +3682,8 @@ function routeAfterLoad() {
     showScreen('screen-setup');
     renderSetupStep();
   } else {
-    showAppPin();
+    if (isAppUnlocked()) renderHome();
+    else showAppPin();
   }
 }
 
@@ -3625,7 +3693,8 @@ function init() {
 
   if (hasLocalData) {
     // Fast path: local data exists — show PIN immediately, sync in background
-    showAppPin();
+    if (isAppUnlocked()) renderHome();
+    else showAppPin();
     auth.signInAnonymously()
       .then(() => subscribeToFirestore())
       .catch(err => console.warn('Firestore sync unavailable:', err));
