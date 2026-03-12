@@ -4725,6 +4725,13 @@ function renderStatsPage(container) {
 }
 
 // ── PARENT HOME (OVERVIEW) ────────────────────────────────────
+const _expandedSlots = new Set(); // 'choreId_kidId'
+function toggleSlotExpand(key) {
+  if (_expandedSlots.has(key)) _expandedSlots.delete(key);
+  else _expandedSlots.add(key);
+  renderParentHome();
+}
+
 function renderParentHome() {
   const kids    = D.family.members.filter(m=>m.role==='kid');
   const pending = pendingApprovals();
@@ -4807,18 +4814,50 @@ function renderParentHome() {
             : status === 'pending'      ? 'Waiting'
             : status === 'unavailable'  ? 'Later'
             : 'To do';
-          const markDoneBtn = isDone
-            ? `<button class="btn-icon-sm btn-icon-delete" style="margin-left:6px;flex-shrink:0" title="Remove completion" onclick="parentUnmarkChoreDone('${chore.id}','${kid.id}')">↩</button>`
-            : `<button class="btn-icon-sm btn-icon-approve" style="margin-left:6px;flex-shrink:0" title="Mark done (award points)" onclick="parentMarkChoreDone('${chore.id}','${kid.id}')">✓</button>`;
           const isCombo = kidCombo.has(chore.id);
+          const expandKey = `${chore.id}_${kid.id}`;
+          const isExpanded = _expandedSlots.has(expandKey);
+
+          let actionBtn, slotExpandSection = '';
+          if (progress.isSlotMode) {
+            // Expand/collapse toggle button
+            actionBtn = `<button class="btn-icon-sm" style="margin-left:6px;flex-shrink:0;background:#EDE9FE;color:var(--purple);font-size:0.75rem" title="Show slots" onclick="toggleSlotExpand('${expandKey}')">${isExpanded ? '▲' : '▼'}</button>`;
+            if (isExpanded) {
+              const slotRows = (progress.slotStatuses || []).map(({ slot, status: ss }) => {
+                const slotLabel = slot.label || (slot.start ? `${slot.start}–${slot.end}` : 'Slot');
+                let slotPill, slotBtn;
+                if (ss === 'done') {
+                  slotPill = `<span class="kid-overview-status done" style="font-size:0.7rem;padding:2px 6px">Done</span>`;
+                  slotBtn  = `<button class="btn-icon-sm btn-icon-delete" style="width:28px;height:28px;font-size:0.8rem;flex-shrink:0" title="Undo" onclick="parentUnmarkSlotDone('${chore.id}','${kid.id}','${slot.id}')">↩</button>`;
+                } else if (ss === 'pending') {
+                  slotPill = `<span class="kid-overview-status pending" style="font-size:0.7rem;padding:2px 6px">Waiting</span>`;
+                  slotBtn  = '';
+                } else {
+                  slotPill = `<span class="kid-overview-status todo" style="font-size:0.7rem;padding:2px 6px">${ss === 'waiting' ? 'Later' : 'To do'}</span>`;
+                  slotBtn  = `<button class="btn-icon-sm btn-icon-approve" style="width:28px;height:28px;font-size:0.8rem;flex-shrink:0" title="Mark done" onclick="parentMarkSlotDone('${chore.id}','${kid.id}','${slot.id}')">✓</button>`;
+                }
+                return `<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:#f9fafb;border-radius:8px">
+                  <span style="flex:1;font-size:0.82rem;color:#374151">${esc(slotLabel)}</span>
+                  ${slotPill}${slotBtn}
+                </div>`;
+              }).join('');
+              slotExpandSection = `<div style="margin-top:8px;display:flex;flex-direction:column;gap:4px">${slotRows}</div>`;
+            }
+          } else {
+            actionBtn = isDone
+              ? `<button class="btn-icon-sm btn-icon-delete" style="margin-left:6px;flex-shrink:0" title="Remove completion" onclick="parentUnmarkChoreDone('${chore.id}','${kid.id}')">↩</button>`
+              : `<button class="btn-icon-sm btn-icon-approve" style="margin-left:6px;flex-shrink:0" title="Mark done (award points)" onclick="parentMarkChoreDone('${chore.id}','${kid.id}')">✓</button>`;
+          }
+
           return `
-            <div class="kid-overview-item" ${isCombo ? 'style="background:#FFFBEB;box-shadow:inset 3px 0 0 #F59E0B;"' : ''}>
+            <div class="kid-overview-item" style="${isCombo ? 'background:#FFFBEB;box-shadow:inset 3px 0 0 #F59E0B;' : ''}${isExpanded ? 'flex-wrap:wrap;' : ''}">
               <div style="flex:1;min-width:0">
                 <div style="font-weight:700">${chore.icon} ${esc(chore.title)}${isCombo ? ' <span style="font-size:0.65rem;font-weight:800;color:#D97706;vertical-align:middle">⚡</span>' : ''}</div>
                 <div style="font-size:0.82rem;color:var(--muted)">${fmtPts(chore.points)} · ${esc(choreScheduleSummary(chore))}</div>
               </div>
               <span class="kid-overview-status ${statusClass}">${statusLabel}</span>
-              ${markDoneBtn}
+              ${actionBtn}
+              ${slotExpandSection ? `<div style="width:100%;margin-top:0">${slotExpandSection}</div>` : ''}
             </div>`;
         }).join('')}</div>`;
     kidsHtml += `
@@ -4950,10 +4989,12 @@ function parentMarkChoreDone(choreId, memberId) {
   let totalPts = 0;
 
   if (progress.isSlotMode) {
-    // Complete every slot that isn't already done or pending
-    const incomplete = (progress.slotStatuses || []).filter(s => s.status !== 'done' && s.status !== 'pending');
-    if (incomplete.length === 0) { toast(`${chore.icon} All slots already submitted for ${member.name}`); return; }
-    incomplete.forEach(({ slot }) => {
+    // Complete only the currently-available slot(s); if none are in-window, complete just the earliest waiting slot
+    const available = (progress.slotStatuses || []).filter(s => s.status === 'available');
+    const waiting   = (progress.slotStatuses || []).filter(s => s.status === 'waiting');
+    const toComplete = available.length > 0 ? available : waiting.slice(0, 1);
+    if (toComplete.length === 0) { toast(`${chore.icon} All slots already submitted for ${member.name}`); return; }
+    toComplete.forEach(({ slot }) => {
       chore.completions[memberId].push({
         id: genId(), status: 'done', date: today(), createdAt: Date.now(),
         slotId: slot.id, photoUrl: null, entryType: null,
@@ -5002,6 +5043,55 @@ function parentUnmarkChoreDone(choreId, memberId) {
   addHistory('penalty', memberId, `↩ Removed: ${chore.title}`, -deduct);
   saveData();
   toast(`↩ Removed "${chore.title}" completion for ${member.name} (−${deduct} pts)`);
+  renderParentHome();
+  renderParentHeader();
+  renderParentNav();
+}
+
+function parentMarkSlotDone(choreId, memberId, slotId) {
+  const chore  = D.chores.find(c => c.id === choreId);
+  const member = getMember(memberId);
+  if (!chore || !member) return;
+  const progress = getChoreProgress(chore, memberId);
+  const slotStatus = progress.slotStatuses?.find(s => s.slot.id === slotId);
+  if (!slotStatus) { toast('Slot not found'); return; }
+  if (slotStatus.status === 'done')    { toast('Already done'); return; }
+  if (slotStatus.status === 'pending') { toast('Already submitted — waiting for approval'); return; }
+  if (!chore.completions) chore.completions = {};
+  chore.completions[memberId] = normalizeCompletionEntries(chore.completions[memberId]);
+  chore.completions[memberId].push({
+    id: genId(), status: 'done', date: today(), createdAt: Date.now(),
+    slotId, photoUrl: null, entryType: null,
+  });
+  member.points      = (member.points      || 0) + chore.points;
+  member.totalEarned = (member.totalEarned || 0) + chore.points;
+  addHistory('chore', memberId, chore.title, chore.points);
+  checkAfterPointsAwarded(member, chore.points);
+  saveData();
+  toast(`✅ ${chore.icon} ${slotStatus.slot.label || 'Slot'} done for ${member.name} (+${chore.points} pts)`);
+  renderParentHome();
+  renderParentHeader();
+  renderParentNav();
+}
+
+function parentUnmarkSlotDone(choreId, memberId, slotId) {
+  const chore  = D.chores.find(c => c.id === choreId);
+  const member = getMember(memberId);
+  if (!chore || !member) return;
+  const entries = normalizeCompletionEntries(chore.completions?.[memberId]);
+  const idx = entries.findIndex(e => e.slotId === slotId && e.status === 'done' && e.date === today() && e.entryType !== 'before');
+  if (idx === -1) { toast('No completion found to remove'); return; }
+  const slot = D.chores.find(c => c.id === choreId)?.schedule?.slots?.find(s => s.id === slotId);
+  entries.splice(idx, 1);
+  if (entries.length === 0) delete chore.completions[memberId];
+  else chore.completions[memberId] = entries;
+  const deduct = Math.min(chore.points, member.points || 0);
+  member.points      = (member.points      || 0) - deduct;
+  member.totalEarned = Math.max(0, (member.totalEarned || 0) - chore.points);
+  if (D.settings.levelingEnabled !== false) member.xp = Math.max(0, (member.xp || 0) - chore.points);
+  addHistory('penalty', memberId, `↩ Removed: ${chore.title} (${slot?.label || 'slot'})`, -deduct);
+  saveData();
+  toast(`↩ Removed ${chore.icon} ${slot?.label || 'slot'} for ${member.name} (−${deduct} pts)`);
   renderParentHome();
   renderParentHeader();
   renderParentNav();
