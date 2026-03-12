@@ -1323,6 +1323,18 @@
       cursor: pointer; border: 2px solid var(--border); margin-top: 8px;
     }
 
+    /* Drag-to-reorder */
+    .drag-handle {
+      cursor: grab; color: var(--muted); font-size: 1.2rem;
+      padding: 4px 6px; flex-shrink: 0; touch-action: none; user-select: none;
+      line-height: 1;
+    }
+    .drag-handle:active { cursor: grabbing; }
+    [data-drag-id].drag-over {
+      outline: 2px dashed var(--purple); outline-offset: 2px; border-radius: 12px;
+    }
+    [data-drag-id].drag-src { opacity: 0.4; }
+
     /* Icon search */
     .icon-search-input {
       width: 100%; padding: 9px 14px; border: 1.5px solid var(--border);
@@ -2635,11 +2647,54 @@ function _nlToggleKid(kidId) {
   _renderNL();
 }
 
+// ── NL ALARM (Web Audio API siren) ───────────────────────────
+let _nlAudioCtx = null;
+let _nlOsc      = null;
+let _nlGain     = null;
+let _nlLfoOsc   = null;  // LFO that sweeps the pitch up and down
+
+function _nlAlarmStart() {
+  try {
+    _nlAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    _nlGain = _nlAudioCtx.createGain();
+    _nlGain.gain.value = 0.55;
+    _nlGain.connect(_nlAudioCtx.destination);
+
+    // Main oscillator — sawtooth for that harsh alarm bite
+    _nlOsc = _nlAudioCtx.createOscillator();
+    _nlOsc.type = 'sawtooth';
+    _nlOsc.frequency.value = 880;
+    _nlOsc.connect(_nlGain);
+    _nlOsc.start();
+
+    // LFO that sweeps pitch between ~660 Hz and ~1100 Hz at ~1.4 Hz
+    _nlLfoOsc = _nlAudioCtx.createOscillator();
+    _nlLfoOsc.type = 'sine';
+    _nlLfoOsc.frequency.value = 1.4;
+
+    const lfoGain = _nlAudioCtx.createGain();
+    lfoGain.gain.value = 220;  // ±220 Hz sweep around 880
+    _nlLfoOsc.connect(lfoGain);
+    lfoGain.connect(_nlOsc.frequency);
+    _nlLfoOsc.start();
+  } catch(e) { /* audio not available — silently skip */ }
+}
+
+function _nlAlarmStop() {
+  try {
+    if (_nlOsc)    { _nlOsc.stop();    _nlOsc    = null; }
+    if (_nlLfoOsc) { _nlLfoOsc.stop(); _nlLfoOsc = null; }
+    if (_nlAudioCtx) { _nlAudioCtx.close(); _nlAudioCtx = null; }
+  } catch(e) {}
+}
+
 function _nlHoldStart(evt) {
   if (evt) evt.preventDefault();
   if (_nlState.isHolding) return;
   _nlState.isHolding = true;
   _nlState.holdStart = Date.now();
+  _nlAlarmStart();
   _renderNL();
   _nlTick();
 }
@@ -2650,6 +2705,7 @@ function _nlHoldEnd(evt) {
   _nlState.accumulated += Date.now() - _nlState.holdStart;
   _nlState.isHolding = false;
   _nlState.holdStart = null;
+  _nlAlarmStop();
   if (_nlState.rafId) { cancelAnimationFrame(_nlState.rafId); _nlState.rafId = null; }
   _nlUpdateDisplay();
   _renderNL();
@@ -2678,6 +2734,7 @@ function _nlUpdateDisplay() {
 }
 
 function _nlCancel() {
+  _nlAlarmStop();
   if (_nlState.rafId) cancelAnimationFrame(_nlState.rafId);
   _nlState = { isHolding:false, holdStart:null, accumulated:0, pointsLost:0, selectedKids:[], rafId:null };
   document.getElementById('nl-root').classList.remove('open');
@@ -3475,28 +3532,54 @@ function renderKidChores() {
       todo.forEach(c => { html += tinyChoreCard(c, m, progressMap.get(c.id)); });
       html += `</div>`;
     } else {
+      html += `<div id="sort-todo">`;
       todo.forEach(c => { html += normalChoreCard(c, m, progressMap.get(c.id)); });
+      html += `</div>`;
     }
   }
 
   // Pending / partial
   if (pending.length > 0) {
     html += `<div class="card-title mt-12">⏳ In Progress</div>`;
-    pending.forEach(c => { html += tiny ? tinyChoreCard(c,m,progressMap.get(c.id)) : normalChoreCard(c,m,progressMap.get(c.id)); });
+    if (tiny) {
+      pending.forEach(c => { html += tinyChoreCard(c,m,progressMap.get(c.id)); });
+    } else {
+      html += `<div id="sort-pending">`;
+      pending.forEach(c => { html += normalChoreCard(c,m,progressMap.get(c.id)); });
+      html += `</div>`;
+    }
   }
 
   // Done
   if (done.length > 0) {
     html += `<div class="card-title mt-12">✅ Done Today</div>`;
-    done.forEach(c => { html += tiny ? tinyChoreCard(c,m,progressMap.get(c.id)) : normalChoreCard(c,m,progressMap.get(c.id)); });
+    if (tiny) {
+      done.forEach(c => { html += tinyChoreCard(c,m,progressMap.get(c.id)); });
+    } else {
+      html += `<div id="sort-done">`;
+      done.forEach(c => { html += normalChoreCard(c,m,progressMap.get(c.id)); });
+      html += `</div>`;
+    }
   }
 
   if (unavailable.length > 0) {
     html += `<div class="card-title mt-12">🕒 Later</div>`;
-    unavailable.forEach(c => { html += tiny ? tinyChoreCard(c,m,progressMap.get(c.id)) : normalChoreCard(c,m,progressMap.get(c.id)); });
+    if (tiny) {
+      unavailable.forEach(c => { html += tinyChoreCard(c,m,progressMap.get(c.id)); });
+    } else {
+      html += `<div id="sort-unavail">`;
+      unavailable.forEach(c => { html += normalChoreCard(c,m,progressMap.get(c.id)); });
+      html += `</div>`;
+    }
   }
 
   document.getElementById('kid-content').innerHTML = html;
+
+  // Wire up sortable on each section (shares the same D.chores array)
+  ['sort-todo','sort-pending','sort-done','sort-unavail'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) initSortable(el, ids => applyChoreReorder(ids));
+  });
 }
 
 function normalChoreCard(chore, member, progress) {
@@ -3517,7 +3600,8 @@ function normalChoreCard(chore, member, progress) {
       return `<div class="chore-slot-row"><span class="chore-slot-label">${esc(label)}</span>${slotBtn}</div>`;
     }).join('');
     return `
-      <div class="chore-item ${progress.status}">
+      <div class="chore-item ${progress.status}" data-drag-id="${chore.id}">
+        <span class="drag-handle">⠿</span>
         <span class="chore-icon">${chore.icon}</span>
         <div class="chore-info">
           <div class="chore-name">${esc(chore.title)}</div>
@@ -3547,7 +3631,8 @@ function normalChoreCard(chore, member, progress) {
     btnHtml = `<span class="chore-btn chore-btn-done">✅ Done</span>`;
   }
   return `
-    <div class="chore-item ${status}">
+    <div class="chore-item ${status}" data-drag-id="${chore.id}">
+      <span class="drag-handle">⠿</span>
       <span class="chore-icon">${chore.icon}</span>
       <div class="chore-info">
         <div class="chore-name">${esc(chore.title)}</div>
@@ -3586,7 +3671,8 @@ function normalChoreCardPhoto(chore, member, progress, photoPhase) {
   }
 
   return `
-    <div class="chore-item ${statusClass}">
+    <div class="chore-item ${statusClass}" data-drag-id="${chore.id}">
+      <span class="drag-handle">⠿</span>
       <span class="chore-icon">${chore.icon}</span>
       <div class="chore-info">
         <div class="chore-name">${esc(chore.title)}</div>
@@ -4442,6 +4528,97 @@ function parentMarkChoreDone(choreId, memberId) {
   renderParentNav();
 }
 
+// ── DRAG-TO-REORDER ──────────────────────────────────────────
+function applyChoreReorder(newOrderIds) {
+  // Slot the reordered IDs back into the same positions they occupied in D.chores
+  const idSet = new Set(newOrderIds);
+  const positions = [];
+  D.chores.forEach((c, i) => { if (idSet.has(c.id)) positions.push(i); });
+  positions.sort((a, b) => a - b);
+  const lookup = Object.fromEntries(D.chores.map(c => [c.id, c]));
+  const newChores = [...D.chores];
+  newOrderIds.forEach((id, rank) => { newChores[positions[rank]] = lookup[id]; });
+  D.chores = newChores;
+  saveData();
+}
+
+function initSortable(containerEl, onReorder) {
+  if (!containerEl) return;
+  const items = () => [...containerEl.querySelectorAll('[data-drag-id]')];
+
+  // ── Desktop HTML5 DnD ──
+  let dragSrc = null;
+
+  containerEl.addEventListener('dragstart', e => {
+    dragSrc = e.target.closest('[data-drag-id]');
+    if (!dragSrc) return;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', dragSrc.dataset.dragId);
+    dragSrc.classList.add('drag-src');
+  });
+  containerEl.addEventListener('dragend', () => {
+    items().forEach(el => el.classList.remove('drag-src', 'drag-over'));
+    dragSrc = null;
+  });
+  containerEl.addEventListener('dragover', e => {
+    const target = e.target.closest('[data-drag-id]');
+    if (!target || !dragSrc || target === dragSrc) { e.preventDefault(); return; }
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    items().forEach(el => el.classList.remove('drag-over'));
+    target.classList.add('drag-over');
+  });
+  containerEl.addEventListener('drop', e => {
+    e.preventDefault();
+    const target = e.target.closest('[data-drag-id]');
+    if (!target || !dragSrc || target === dragSrc) return;
+    items().forEach(el => el.classList.remove('drag-over'));
+    const all = items();
+    if (all.indexOf(dragSrc) < all.indexOf(target)) target.after(dragSrc);
+    else target.before(dragSrc);
+    dragSrc.classList.remove('drag-src');
+    onReorder(items().map(el => el.dataset.dragId));
+  });
+
+  // ── Mobile touch ──
+  let touchSrc = null, touchOver = null;
+
+  containerEl.addEventListener('touchstart', e => {
+    const handle = e.target.closest('.drag-handle');
+    if (!handle) return;
+    touchSrc = handle.closest('[data-drag-id]');
+    if (!touchSrc) return;
+    touchSrc.classList.add('drag-src');
+    e.preventDefault();
+  }, { passive: false });
+
+  containerEl.addEventListener('touchmove', e => {
+    if (!touchSrc) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    touchSrc.style.pointerEvents = 'none';
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    touchSrc.style.pointerEvents = '';
+    const target = el?.closest('[data-drag-id]');
+    if (touchOver && touchOver !== target) touchOver.classList.remove('drag-over');
+    if (target && target !== touchSrc) { target.classList.add('drag-over'); touchOver = target; }
+    else touchOver = null;
+  }, { passive: false });
+
+  containerEl.addEventListener('touchend', () => {
+    if (!touchSrc) return;
+    touchSrc.classList.remove('drag-src');
+    if (touchOver) {
+      touchOver.classList.remove('drag-over');
+      const all = items();
+      if (all.indexOf(touchSrc) < all.indexOf(touchOver)) touchOver.after(touchSrc);
+      else touchOver.before(touchSrc);
+      onReorder(items().map(el => el.dataset.dragId));
+    }
+    touchSrc = null; touchOver = null;
+  });
+}
+
 // ── PARENT CHORES ─────────────────────────────────────────────
 function renderParentChores() {
   const kids = D.family.members.filter(m=>m.role==='kid');
@@ -4455,10 +4632,12 @@ function renderParentChores() {
     html += `<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">No chores yet. Add one!</div></div>`;
   }
 
+  html += `<div id="chore-sort-list">`;
   D.chores.forEach(chore => {
     const assignedKids = (chore.assignedTo||[]).map(id=>getMember(id)?.avatar||'').join(' ');
     html += `
-      <div class="admin-card">
+      <div class="admin-card" data-drag-id="${chore.id}">
+        <span class="drag-handle" title="Drag to reorder">⠿</span>
         <span class="admin-icon">${chore.icon}</span>
         <div class="admin-info">
           <div class="admin-name">${esc(chore.title)}</div>
@@ -4470,8 +4649,10 @@ function renderParentChores() {
         </div>
       </div>`;
   });
+  html += `</div>`;
 
   document.getElementById('parent-content').innerHTML = html;
+  initSortable(document.getElementById('chore-sort-list'), ids => applyChoreReorder(ids));
 }
 
 // Ephemeral slot state while modal is open
