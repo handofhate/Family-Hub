@@ -5541,7 +5541,7 @@ function renderBadgeEditor() {
   const list = document.getElementById('cm-badge-list');
   if (!list) return;
   list.innerHTML = _editBadges.map((b, i) => `
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;padding:6px 8px;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;padding:6px 8px;background:${b.secret?'#fdf4ff':'#f9fafb'};border-radius:8px;border:1px solid ${b.secret?'#e9d5ff':'#e5e7eb'}">
       <input type="text" value="${esc(b.icon||'')}" placeholder="🏅" style="width:44px;font-size:1.2rem;text-align:center;border:1px solid #d1d5db;border-radius:6px;padding:4px"
         oninput="_editBadges[${i}].icon=this.value">
       <input type="number" value="${b.count||10}" min="1" placeholder="Count" style="width:60px;border:1px solid #d1d5db;border-radius:6px;padding:4px 6px;font-size:0.85rem"
@@ -5549,6 +5549,9 @@ function renderBadgeEditor() {
         title="Total completions needed">
       <input type="text" value="${esc(b.name||'')}" placeholder="Badge name" style="flex:1;border:1px solid #d1d5db;border-radius:6px;padding:4px 6px;font-size:0.85rem"
         oninput="_editBadges[${i}].name=this.value">
+      <label title="Secret — hidden until earned" style="display:flex;align-items:center;gap:3px;font-size:0.72rem;font-weight:600;color:${b.secret?'#7c3aed':'#9ca3af'};cursor:pointer;flex-shrink:0;user-select:none">
+        <input type="checkbox" ${b.secret?'checked':''} onchange="_editBadges[${i}].secret=this.checked;renderBadgeEditor()" style="cursor:pointer">🔒
+      </label>
       <button onclick="removeChoreBadge(${i})" style="background:#FEE2E2;color:#991b1b;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:0.8rem;flex-shrink:0">✕</button>
     </div>`).join('');
   const addBtn = document.querySelector('#cm-badge-editor > button');
