@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="110" fill="#6C63FF"/>
+  <!-- House body -->
+  <rect x="156" y="272" width="200" height="160" rx="10" fill="white"/>
+  <!-- Door -->
+  <rect x="218" y="340" width="76" height="92" rx="8" fill="#C4B5FD"/>
+  <!-- Roof -->
+  <polygon points="256,110 390,272 122,272" fill="white"/>
+  <!-- Star (top center, in roof area) -->
+  <polygon points="256,130 268,164 304,164 276,185 287,219 256,198 225,219 236,185 208,164 244,164"
+           fill="#FFD93D"/>
+</svg>
