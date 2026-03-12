@@ -2108,6 +2108,9 @@ function normalizeMember(m) {
   if (!Array.isArray(m.badges)) m.badges = [];
   if (typeof m.xp === 'undefined') m.xp = m.totalEarned || 0;
   if (typeof m.comboBonusDate === 'undefined') m.comboBonusDate = null;
+  if (typeof m.nlTodaySecs === 'undefined') m.nlTodaySecs = 0;
+  if (typeof m.nlDate === 'undefined') m.nlDate = null;
+  if (typeof m.nlLifetimeSecs === 'undefined') m.nlLifetimeSecs = 0;
   return m;
 }
 
@@ -2657,27 +2660,46 @@ function _seededShuffle(arr, seed) {
   return a;
 }
 
-// Cache so getDailyCombo is O(1) after first call per day/member
-let _comboCache = {};
+// Build all kids' combos in one pass so no chore appears in two kids' combos.
+// Kids are processed in stable ID order; first kid gets first pick.
+let _allCombosCache = { key: null, combos: {} };
+
+function getAllDailyCombos() {
+  const kids = D.family.members.filter(m => m.role === 'kid');
+  const cacheKey = today() + '|' + kids.map(m => m.id).sort().join(',');
+  if (_allCombosCache.key === cacheKey) return _allCombosCache.combos;
+
+  const sortedKids = [...kids].sort((a, b) => a.id.localeCompare(b.id));
+  const combos = {};
+  const used   = new Set(); // chore IDs already claimed by an earlier kid
+
+  for (const kid of sortedKids) {
+    const eligible = D.chores.filter(c =>
+      c.assignedTo?.includes(kid.id) &&
+      c.schedule?.period !== 'once'  &&
+      !used.has(c.id)
+    );
+    let ids;
+    if (eligible.length <= 3) {
+      ids = eligible.map(c => c.id);
+    } else {
+      let seed = 0;
+      const str = today() + '|' + kid.id;
+      for (let i = 0; i < str.length; i++) {
+        seed = Math.imul(seed ^ str.charCodeAt(i), 0x9E3779B9);
+      }
+      ids = _seededShuffle(eligible, seed).slice(0, 3).map(c => c.id);
+    }
+    combos[kid.id] = ids;
+    ids.forEach(id => used.add(id));
+  }
+
+  _allCombosCache = { key: cacheKey, combos };
+  return combos;
+}
+
 function getDailyCombo(memberId) {
-  const key = today() + '|' + memberId;
-  if (_comboCache[key]) return _comboCache[key];
-  // Only include repeating chores assigned to this member
-  const eligible = D.chores.filter(c =>
-    c.assignedTo?.includes(memberId) && c.schedule?.period !== 'once'
-  );
-  if (eligible.length <= 3) {
-    _comboCache[key] = eligible.map(c => c.id);
-    return _comboCache[key];
-  }
-  // Seed: hash of today's date string + member ID
-  let seed = 0;
-  const str = key;
-  for (let i = 0; i < str.length; i++) {
-    seed = Math.imul(seed ^ str.charCodeAt(i), 0x9E3779B9);
-  }
-  _comboCache[key] = _seededShuffle(eligible, seed).slice(0, 3).map(c => c.id);
-  return _comboCache[key];
+  return getAllDailyCombos()[memberId] || [];
 }
 
 function checkComboBonus(memberId) {
@@ -2738,11 +2760,17 @@ function _renderNL() {
     <div class="nl-timer" id="nl-timer">${mins}:${secs}</div>
     <div class="nl-pts-lost" id="nl-pts">${st.pointsLost > 0 ? `−${st.pointsLost} pts so far` : 'Hold the button to deduct points'}</div>
     <div class="nl-kids">
-      ${kids.map(k => `
+      ${kids.map(k => {
+        const t = today();
+        normalizeMember(k);
+        const todaySecs = (k.nlDate === t ? k.nlTodaySecs || 0 : 0) + (st.selectedKids.includes(k.id) ? Math.floor(st.accumulated / 1000) : 0);
+        const secsLabel = todaySecs > 0 ? ` · ${Math.floor(todaySecs/60)}m${todaySecs%60}s today` : '';
+        return `
         <div class="nl-kid-chip ${st.selectedKids.includes(k.id)?'selected':''}"
              onclick="_nlToggleKid('${k.id}')">
-          ${k.avatar||'🙂'} ${esc(k.name)}
-        </div>`).join('')}
+          ${k.avatar||'🙂'} ${esc(k.name)}<br><span style="font-size:0.72rem;opacity:0.8">${secsLabel||'no time today'}</span>
+        </div>`;
+      }).join('')}
     </div>
     <button class="nl-hold-btn ${st.isHolding?'holding':''}" id="nl-btn"
       onmousedown="_nlHoldStart()" onmouseup="_nlHoldEnd()" onmouseleave="_nlHoldEnd()"
@@ -2860,16 +2888,27 @@ function _nlCancel() {
 function _nlDone() {
   if (_nlState.isHolding) _nlHoldEnd();
   const pts = _nlState.pointsLost;
-  if (pts > 0 && _nlState.selectedKids.length > 0) {
+  const sessionSecs = Math.floor(_nlState.accumulated / 1000);
+  const t = today();
+  if (_nlState.selectedKids.length > 0) {
     _nlState.selectedKids.forEach(kidId => {
       const m = getMember(kidId);
       if (!m) return;
-      m.points = Math.max(0, (m.points || 0) - pts);
-      addHistory('penalty', kidId, `🔇 Not listening penalty`, -pts);
+      normalizeMember(m);
+      // Persist NL seconds for today and lifetime
+      if (m.nlDate !== t) { m.nlTodaySecs = 0; m.nlDate = t; }
+      m.nlTodaySecs = (m.nlTodaySecs || 0) + sessionSecs;
+      m.nlLifetimeSecs = (m.nlLifetimeSecs || 0) + sessionSecs;
+      if (pts > 0) {
+        m.points = Math.max(0, (m.points || 0) - pts);
+        addHistory('penalty', kidId, `🔇 Not listening penalty`, -pts);
+      }
     });
     saveData();
-    const names = _nlState.selectedKids.map(id => getMember(id)?.name).filter(Boolean).join(' & ');
-    toast(`🔇 Deducted ${pts} pts from ${names}`);
+    if (pts > 0) {
+      const names = _nlState.selectedKids.map(id => getMember(id)?.name).filter(Boolean).join(' & ');
+      toast(`🔇 Deducted ${pts} pts from ${names}`);
+    }
     renderParentHome();
     renderParentHeader();
     renderParentNav();
@@ -3576,6 +3615,7 @@ function renderKidNav() {
     ['points','⭐','Points'],
     ['shop','🛍️','Shop'],
     ['goal','🎯','Goal'],
+    ['stats','📊','Stats'],
   ];
   document.getElementById('kid-nav').innerHTML = tabs.map(([id,icon,label]) => `
     <button class="nav-item${S.kidTab===id?' active':''}" onclick="switchKidTab('${id}')">
@@ -3595,6 +3635,7 @@ function renderKidTab() {
     case 'points': renderKidPoints(); break;
     case 'shop':   renderKidShop();   break;
     case 'goal':   renderKidGoal();   break;
+    case 'stats':  renderStatsPage(document.getElementById('kid-content')); break;
   }
 }
 
@@ -4417,6 +4458,7 @@ function renderParentNav() {
     ['chores','📋','Chores'],
     ['prizes','🎁','Prizes'],
     ['plans','📅','Plans'],
+    ['stats','📊','Stats'],
     ['settings','⚙️','Settings'],
   ];
   document.getElementById('parent-nav').innerHTML = tabs.map(([id,icon,label]) => `
@@ -4438,8 +4480,222 @@ function renderParentTab() {
     case 'chores':   renderParentChores();   break;
     case 'prizes':   renderParentPrizes();   break;
     case 'plans':    renderParentPlans();    break;
+    case 'stats':    renderStatsPage(document.getElementById('parent-content')); break;
     case 'settings': renderParentSettings(); break;
   }
+}
+
+// ── LIFETIME STATS ────────────────────────────────────────────
+function buildMemberStats(member) {
+  const hist = (D.history || []).filter(h => h.memberId === member.id);
+  normalizeMember(member);
+
+  // Chore history breakdown
+  const choreHist  = hist.filter(h => h.type === 'chore');
+  const prizeHist  = hist.filter(h => h.type === 'prize');
+  const penaltyHist = hist.filter(h => h.type === 'penalty');
+  const bonusHist  = hist.filter(h => h.type === 'bonus');
+  const levelHist  = hist.filter(h => h.type === 'level');
+
+  // Per-chore counts
+  const choreCount = {};
+  choreHist.forEach(h => { choreCount[h.title] = (choreCount[h.title] || 0) + 1; });
+  const choreBreakdown = Object.entries(choreCount).sort((a,b) => b[1]-a[1]);
+
+  // Per-prize counts (from prize.redemptions)
+  const prizeCount = {};
+  (D.prizes || []).forEach(p => {
+    const count = (p.redemptions || []).filter(r => r.memberId === member.id).length;
+    if (count > 0) prizeCount[p.title] = { count, icon: p.icon || '🎁', cost: p.cost };
+  });
+  const prizeBreakdown = Object.entries(prizeCount).sort((a,b) => b[1].count - a[1].count);
+
+  // Active days (days with any history)
+  const activeDates = new Set(hist.map(h => h.date));
+  const daysActive = activeDates.size;
+
+  // Most productive date
+  const ptsByDate = {};
+  choreHist.forEach(h => { ptsByDate[h.date] = (ptsByDate[h.date]||0) + (h.points||0); });
+  const bestDate = Object.entries(ptsByDate).sort((a,b)=>b[1]-a[1])[0];
+
+  // Favorite chore
+  const favChore = choreBreakdown[0] || null;
+
+  // NL time
+  const nlSecs = member.nlLifetimeSecs || 0;
+  const nlFmt = nlSecs === 0 ? '0s' : `${Math.floor(nlSecs/60)}m ${nlSecs%60}s`;
+
+  // Level info
+  const lvlInfo = getMemberLevel(member);
+
+  return {
+    choreDone:        choreHist.length,
+    starsEarned:      choreHist.reduce((s,h) => s + (h.points||0), 0),
+    rewardCount:      prizeHist.length,
+    pointsSpent:      prizeHist.reduce((s,h) => s + Math.abs(h.points||0), 0),
+    penaltyCount:     penaltyHist.length,
+    penaltyAmount:    penaltyHist.reduce((s,h) => s + Math.abs(h.points||0), 0),
+    nlLifetimeSecs:   nlSecs,
+    nlFmt,
+    totalXP:          member.xp || member.totalEarned || 0,
+    badgeCount:       (member.badges || []).length,
+    bestStreak:       member.streak?.best || 0,
+    currentStreak:    member.streak?.current || 0,
+    savings:          member.savings || 0,
+    comboCount:       bonusHist.length,
+    comboStars:       bonusHist.reduce((s,h) => s + Math.abs(h.points||0), 0),
+    levelUps:         levelHist.length,
+    currentLevel:     lvlInfo.current,
+    daysActive,
+    bestDate:         bestDate ? { date: bestDate[0], pts: bestDate[1] } : null,
+    favChore,
+    avgChoresPerDay:  daysActive > 0 ? (choreHist.length / daysActive).toFixed(1) : '—',
+    choreBreakdown,
+    prizeBreakdown,
+    totalPoints:      member.points || 0,
+    totalEarned:      member.totalEarned || 0,
+  };
+}
+
+function _statTile(icon, label, value, color, sub) {
+  return `
+    <div style="background:#fff;border-radius:14px;padding:14px 10px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.07);display:flex;flex-direction:column;align-items:center;gap:4px">
+      <div style="font-size:1.6rem">${icon}</div>
+      <div style="font-size:1.35rem;font-weight:800;color:${color||'#1f2937'};line-height:1.1">${value}</div>
+      <div style="font-size:0.72rem;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em">${label}</div>
+      ${sub ? `<div style="font-size:0.7rem;color:#9ca3af">${sub}</div>` : ''}
+    </div>`;
+}
+
+function _statSection(title, tilesHtml) {
+  return `
+    <div style="margin-bottom:18px">
+      <div style="font-size:0.78rem;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#9ca3af;margin-bottom:8px;padding:0 2px">${title}</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">${tilesHtml}</div>
+    </div>`;
+}
+
+function _statBreakdownTable(rows, col1, col2) {
+  if (!rows.length) return `<div style="color:#9ca3af;font-size:0.85rem;padding:6px 0">None yet</div>`;
+  return `<table style="width:100%;border-collapse:collapse;font-size:0.85rem">
+    ${rows.map(([name,val],i) => `
+      <tr style="border-bottom:1px solid #f3f4f6">
+        <td style="padding:5px 4px;font-weight:${i===0?'700':'500'}">${esc(name)}</td>
+        <td style="padding:5px 4px;text-align:right;font-weight:700;color:#6C63FF">${val} ${col2}</td>
+      </tr>`).join('')}
+  </table>`;
+}
+
+function renderMemberStatsCard(member) {
+  const s = buildMemberStats(member);
+  const color = member.color || '#6C63FF';
+
+  const choresSection = _statSection('⭐ Chores & Points',
+    _statTile('✅','Chores Done', s.choreDone, '#166534') +
+    _statTile('⭐','Stars Earned', s.starsEarned, '#92400e') +
+    _statTile('🔮','Total XP', s.totalXP, '#4c1d95')
+  );
+
+  const levelSection = _statSection('🏆 Level & Streaks',
+    _statTile('🏆','Level', `${s.currentLevel.icon} ${s.currentLevel.level}`, color, s.currentLevel.name) +
+    _statTile('🔥','Best Streak', `${s.bestStreak}d`, '#b45309') +
+    _statTile('📅','Days Active', s.daysActive, '#0e7490')
+  );
+
+  const rewardSection = _statSection('🎁 Rewards & Combos',
+    _statTile('🎁','Prizes Won', s.rewardCount, '#1e40af') +
+    _statTile('⚡','Combos Hit', s.comboCount, '#b45309', `+${s.comboStars} bonus pts`) +
+    _statTile('💰','Saved Up', `${s.savings}★`, '#166534')
+  );
+
+  const badgeSection = _statSection('🎖️ Achievements',
+    _statTile('🎖️','Badges', s.badgeCount, '#7c3aed') +
+    _statTile('📈','Level-Ups', s.levelUps, '#0f766e') +
+    _statTile('📊','Avg/Day', s.avgChoresPerDay, '#374151', 'chores per active day')
+  );
+
+  const penaltySection = _statSection('🔇 Penalties',
+    _statTile('🔇','Penalties', s.penaltyCount, '#991b1b') +
+    _statTile('💸','Pts Lost', s.penaltyAmount, '#991b1b') +
+    _statTile('⏱️','NL Time', s.nlFmt, '#b45309', 'lifetime')
+  );
+
+  const bestDaySub = s.bestDate ? `${fmtDate(s.bestDate.date)} · ${s.bestDate.pts} pts` : 'No data yet';
+  const favChoreSub = s.favChore ? `${s.favChore[1]}× completed` : 'No chores yet';
+  const extraSection = _statSection('🌟 Fun Facts',
+    _statTile('🗓️','Best Day', s.bestDate ? `${s.bestDate.pts}★` : '—', '#d97706', bestDaySub) +
+    _statTile('❤️','Fav Chore', s.favChore ? `${s.favChore[0].split(' ')[0]}` : '—', '#db2777', favChoreSub) +
+    _statTile('💵','Pts Spent', s.pointsSpent, '#374151', 'on prizes')
+  );
+
+  // Chore breakdown table
+  const choreTableRows = s.choreBreakdown.map(([name,count]) => [name, count]);
+  const choreTable = `
+    <div style="margin-bottom:18px">
+      <div style="font-size:0.78rem;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#9ca3af;margin-bottom:8px">📋 Chore Breakdown</div>
+      ${_statBreakdownTable(choreTableRows.slice(0,10), 'Chore', 'times')}
+    </div>`;
+
+  // Prize breakdown table
+  const prizeTableRows = s.prizeBreakdown.map(([name,info]) => [
+    `${info.icon} ${name}`, `${info.count}×`
+  ]);
+  const prizeTable = `
+    <div style="margin-bottom:18px">
+      <div style="font-size:0.78rem;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#9ca3af;margin-bottom:8px">🎁 Prize Breakdown</div>
+      ${prizeTableRows.length
+        ? `<table style="width:100%;border-collapse:collapse;font-size:0.85rem">
+            ${prizeTableRows.slice(0,10).map(([name,val],i) => `
+              <tr style="border-bottom:1px solid #f3f4f6">
+                <td style="padding:5px 4px;font-weight:${i===0?'700':'500'}">${esc(name)}</td>
+                <td style="padding:5px 4px;text-align:right;font-weight:700;color:#6C63FF">${val}</td>
+              </tr>`).join('')}
+          </table>`
+        : '<div style="color:#9ca3af;font-size:0.85rem;padding:6px 0">No prizes redeemed yet</div>'
+      }
+    </div>`;
+
+  return `
+    <div class="card" style="border-top:4px solid ${color};padding:20px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">
+        <span style="font-size:2.5rem">${member.avatar||'🙂'}</span>
+        <div>
+          <div style="font-size:1.3rem;font-weight:800">${esc(member.name)}</div>
+          <div style="font-size:0.85rem;color:#6b7280">${s.currentLevel.icon} ${s.currentLevel.name} · ${s.totalEarned} total stars earned</div>
+        </div>
+      </div>
+      ${choresSection}
+      ${levelSection}
+      ${rewardSection}
+      ${badgeSection}
+      ${penaltySection}
+      ${extraSection}
+      ${choreTable}
+      ${prizeTable}
+    </div>`;
+}
+
+function renderStatsPage(container) {
+  if (!container) return;
+  const viewer = S.currentUser;
+  const isKid  = viewer?.role === 'kid';
+  const kids   = D.family.members.filter(m => m.role === 'kid');
+
+  let html = `<div style="padding-bottom:20px"><div style="font-size:1.2rem;font-weight:800;padding:16px 0 12px">📊 Lifetime Stats</div>`;
+
+  if (isKid) {
+    html += renderMemberStatsCard(viewer);
+  } else {
+    if (kids.length === 0) {
+      html += `<div class="empty-state"><div class="empty-icon">👶</div><div class="empty-text">No kids added yet</div></div>`;
+    } else {
+      kids.forEach(kid => { html += renderMemberStatsCard(kid); });
+    }
+  }
+
+  html += `</div>`;
+  container.innerHTML = html;
 }
 
 // ── PARENT HOME (OVERVIEW) ────────────────────────────────────
@@ -4510,6 +4766,7 @@ function renderParentHome() {
     const doneCount = myChores.filter(c=>choreStatus(c,kid.id)==='done').length;
     const pendCount = myChores.filter(c=>['pending','partial'].includes(choreStatus(c,kid.id))).length;
     const pct       = myChores.length>0 ? Math.round(doneCount/myChores.length*100) : 0;
+    const kidCombo  = new Set(getDailyCombo(kid.id));
     const choreRows = myChores.length === 0
       ? `<div class="empty-state" style="padding:16px 8px"><div class="empty-text">No chores assigned</div></div>`
       : `<div class="kid-overview-list">${myChores.map(chore => {
@@ -4527,10 +4784,11 @@ function renderParentHome() {
           const markDoneBtn = isDone
             ? `<button class="btn-icon-sm btn-icon-delete" style="margin-left:6px;flex-shrink:0" title="Remove completion" onclick="parentUnmarkChoreDone('${chore.id}','${kid.id}')">↩</button>`
             : `<button class="btn-icon-sm btn-icon-approve" style="margin-left:6px;flex-shrink:0" title="Mark done (award points)" onclick="parentMarkChoreDone('${chore.id}','${kid.id}')">✓</button>`;
+          const isCombo = kidCombo.has(chore.id);
           return `
-            <div class="kid-overview-item">
+            <div class="kid-overview-item" ${isCombo ? 'style="background:#FFFBEB;border-radius:10px;margin-left:-4px;margin-right:-4px;padding-left:8px;padding-right:4px;border-left:3px solid #F59E0B;"' : ''}>
               <div style="flex:1;min-width:0">
-                <div style="font-weight:700">${chore.icon} ${esc(chore.title)}</div>
+                <div style="font-weight:700">${chore.icon} ${esc(chore.title)}${isCombo ? ' <span style="font-size:0.65rem;font-weight:800;color:#D97706;vertical-align:middle">⚡</span>' : ''}</div>
                 <div style="font-size:0.82rem;color:var(--muted)">${fmtPts(chore.points)} · ${esc(choreScheduleSummary(chore))}</div>
               </div>
               <span class="kid-overview-status ${statusClass}">${statusLabel}</span>
@@ -4576,6 +4834,55 @@ function renderParentHome() {
                 onclick="showNotListening()">🔇 You're Not Listening</button>
       </div>
     </div>`;
+
+  // NL time tracker
+  const nlKids = D.family.members.filter(m => m.role === 'kid');
+  const nlRows = nlKids.map(k => {
+    normalizeMember(k);
+    const secs = (k.nlDate === t ? k.nlTodaySecs || 0 : 0);
+    const label = secs === 0 ? 'None today' : `${Math.floor(secs/60)}m ${secs%60}s`;
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f3f4f6">
+      <span>${k.avatar||'🙂'} ${esc(k.name)}</span>
+      <span style="font-weight:700;color:${secs>0?'#EF4444':'var(--muted)'}">${label}</span>
+    </div>`;
+  }).join('');
+  html += `
+    <div class="card">
+      <div class="card-title">🔇 Not-Listening Time Today</div>
+      ${nlRows || '<div style="color:var(--muted);font-size:0.9rem">No kids added yet</div>'}
+    </div>`;
+
+  // Recent Activity
+  const recentHistory = (D.history || []).slice(0, 10);
+  if (recentHistory.length > 0) {
+    const typeIcon = { chore:'✅', prize:'🎁', penalty:'🔇', bonus:'⚡', level:'🏆' };
+    const typeColor = { chore:'#166534', prize:'#1e40af', penalty:'#991b1b', bonus:'#92400e', level:'#4c1d95' };
+    const typeBg    = { chore:'#DCFCE7', prize:'#DBEAFE', penalty:'#FEE2E2', bonus:'#FEF3C7', level:'#EDE9FE' };
+    const actRows = recentHistory.map(h => {
+      const mem = getMember(h.memberId);
+      const icon = typeIcon[h.type] || '📝';
+      const color = typeColor[h.type] || '#374151';
+      const bg    = typeBg[h.type]   || '#f9fafb';
+      const ptsStr = h.points > 0 ? `+${h.points}` : `${h.points}`;
+      const ptsColor = h.points >= 0 ? '#166534' : '#991b1b';
+      return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #f3f4f6">
+        <span style="background:${bg};color:${color};border-radius:8px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:0.85rem;flex-shrink:0">${icon}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(h.title)}</div>
+          <div style="font-size:0.77rem;color:var(--muted)">${mem ? `${mem.avatar} ${esc(mem.name)}` : ''} · ${fmtDate(h.date)}</div>
+        </div>
+        <span style="font-weight:700;color:${ptsColor};font-size:0.9rem;white-space:nowrap">${ptsStr} pts</span>
+      </div>`;
+    }).join('');
+    html += `
+      <details class="card" style="padding:0">
+        <summary style="padding:16px 20px;cursor:pointer;font-weight:700;font-size:1rem;list-style:none;display:flex;align-items:center;gap:8px">
+          <span>📋 Recent Activity</span>
+          <span style="font-size:0.75rem;color:var(--muted);font-weight:400;margin-left:auto">tap to expand</span>
+        </summary>
+        <div style="padding:0 20px 16px">${actRows}</div>
+      </details>`;
+  }
 
   document.getElementById('parent-content').innerHTML = html;
 }
@@ -5772,6 +6079,7 @@ function renderGrandmaNav() {
     ['today','📅','Today'],
     ['family','👨‍👩‍👧‍👦','Family'],
     ['plans','📋','Plans'],
+    ['stats','📊','Stats'],
   ];
   document.getElementById('grandma-nav').innerHTML = tabs.map(([id,icon,label]) => `
     <button class="nav-item${S.grandmaTab===id?' active':''}" onclick="switchGrandmaTab('${id}')">
@@ -5791,6 +6099,7 @@ function renderGrandmaTab() {
     case 'today':  renderGrandmaToday();  break;
     case 'family': renderGrandmaFamily(); break;
     case 'plans':  renderGrandmaPlans();  break;
+    case 'stats':  renderStatsPage(document.getElementById('grandma-content')); break;
   }
 }
 
