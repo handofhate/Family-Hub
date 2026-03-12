@@ -1330,6 +1330,85 @@
       margin-bottom: 10px;
     }
     .icon-search-input:focus { outline: none; border-color: var(--purple); }
+
+    /* ── LEVELS & BADGES ── */
+    .level-banner {
+      display: flex; align-items: center; gap: 10px;
+      background: linear-gradient(135deg,#6C63FF,#EC4899);
+      border-radius: 14px; padding: 10px 14px; margin-bottom: 14px; color: #fff;
+    }
+    .level-banner-icon { font-size: 2rem; line-height: 1; }
+    .level-banner-info { flex: 1; }
+    .level-banner-name { font-weight: 800; font-size: 1.05rem; letter-spacing: 0.02em; }
+    .level-banner-sub  { font-size: 0.8rem; opacity: 0.88; margin-top: 2px; }
+    .level-xp-bar { background: rgba(255,255,255,0.25); border-radius: 99px; height: 8px; margin-top: 6px; }
+    .level-xp-fill { background: #fff; border-radius: 99px; height: 8px; transition: width 0.5s; }
+
+    .badge-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .badge-chip {
+      display: flex; align-items: center; gap: 6px;
+      background: #F3F4F6; border-radius: 99px; padding: 5px 12px 5px 8px;
+      font-size: 0.8rem; font-weight: 600; border: 1.5px solid var(--border);
+    }
+    .badge-chip.earned { background: #FFF7ED; border-color: #F59E0B; color: #92400E; }
+    .badge-chip-icon { font-size: 1.1rem; }
+    .badge-chip-locked { opacity: 0.35; filter: grayscale(1); }
+
+    .streak-row {
+      display: flex; align-items: center; gap: 10px;
+      background: #FFF7ED; border-radius: 12px; padding: 10px 14px;
+      border: 1.5px solid #FDE68A; margin-bottom: 14px;
+    }
+    .streak-flame { font-size: 1.8rem; }
+    .streak-info  { flex: 1; }
+    .streak-count { font-size: 1.3rem; font-weight: 800; color: #D97706; }
+    .streak-label { font-size: 0.78rem; color: #92400E; }
+
+    /* Kid header level/streak badges */
+    .header-level-badge {
+      font-size: 0.72rem; font-weight: 700; background: linear-gradient(135deg,#6C63FF,#EC4899);
+      color: #fff; border-radius: 99px; padding: 2px 8px; white-space: nowrap;
+    }
+    .header-streak-badge {
+      font-size: 0.72rem; font-weight: 700; background: #FFF7ED;
+      color: #D97706; border: 1.5px solid #FDE68A; border-radius: 99px; padding: 2px 8px;
+      white-space: nowrap;
+    }
+
+    /* ── NOT LISTENING OVERLAY ── */
+    #nl-root { position: fixed; inset: 0; z-index: 2000; display: none; }
+    #nl-root.open { display: flex; flex-direction: column; align-items: center;
+      justify-content: center; background: rgba(0,0,0,0.92); padding: 20px; }
+    .nl-title  { color: #fff; font-size: 1.3rem; font-weight: 800; margin-bottom: 8px; text-align: center; }
+    .nl-timer  { color: #EF4444; font-size: 5rem; font-weight: 900; font-variant-numeric: tabular-nums;
+      line-height: 1; margin-bottom: 8px; text-shadow: 0 0 20px rgba(239,68,68,0.6); }
+    .nl-pts-lost { color: #FCA5A5; font-size: 1.1rem; font-weight: 700; margin-bottom: 24px; min-height: 1.6rem; }
+    .nl-kids   { display: flex; gap: 12px; margin-bottom: 28px; flex-wrap: wrap; justify-content: center; }
+    .nl-kid-chip {
+      padding: 8px 18px; border-radius: 99px; border: 2.5px solid #6B7280; background: #1F2937;
+      color: #9CA3AF; font-size: 0.95rem; font-weight: 700; cursor: pointer; user-select: none;
+      transition: all 0.15s;
+    }
+    .nl-kid-chip.selected { border-color: #EF4444; color: #fff; background: #7F1D1D; }
+    .nl-hold-btn {
+      width: 200px; height: 200px; border-radius: 50%; background: #EF4444;
+      border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 6px; user-select: none;
+      box-shadow: 0 0 40px rgba(239,68,68,0.5), 0 0 0 0 rgba(239,68,68,0.4);
+      transition: transform 0.1s, box-shadow 0.1s;
+      -webkit-tap-highlight-color: transparent; touch-action: none;
+    }
+    .nl-hold-btn:active, .nl-hold-btn.holding {
+      transform: scale(0.93);
+      box-shadow: 0 0 60px rgba(239,68,68,0.8), 0 0 0 20px rgba(239,68,68,0.1);
+    }
+    .nl-hold-btn-text { color: #fff; font-size: 1.2rem; font-weight: 900; letter-spacing: 0.05em; }
+    .nl-hold-hint { color: rgba(255,255,255,0.7); font-size: 0.72rem; }
+    .nl-actions { display: flex; gap: 12px; margin-top: 28px; }
+    .nl-btn-done   { padding: 12px 32px; border-radius: 99px; background: #EF4444; color: #fff;
+      font-weight: 800; font-size: 1rem; border: none; cursor: pointer; }
+    .nl-btn-cancel { padding: 12px 32px; border-radius: 99px; background: #374151; color: #9CA3AF;
+      font-weight: 700; font-size: 1rem; border: none; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -1379,6 +1458,7 @@
   <div id="modal-root"></div>
   <div id="celebration-root"></div>
   <div id="confetti-root"></div>
+  <div id="nl-root"></div>
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -1686,11 +1766,20 @@ function defaultData() {
     v: 3,
     setup: false,
     settings: {
-      parentPin:       '',
-      autoApprove:     false,
-      pointsPerDollar: 10,
-      currency:        '$',
-      lastSync:        null,
+      parentPin:        '',
+      autoApprove:      false,
+      pointsPerDollar:  10,
+      currency:         '$',
+      lastSync:         null,
+      // Leveling / streaks
+      levelingEnabled:  true,
+      streakEnabled:    true,
+      streakBonus3:     1,
+      streakBonus7:     3,
+      streakBonus14:    5,
+      streakBonus30:    10,
+      // Not Listening
+      notListeningSecs: 60,
     },
     family: { name:'Our Family', members:[] },
     chores:     [],
@@ -1958,11 +2047,21 @@ function normalizeChore(chore) {
   };
 }
 
+function normalizeMember(m) {
+  if (!m || typeof m !== 'object') return m;
+  if (!m.streak) m.streak = { current: 0, best: 0, lastDate: null };
+  if (!Array.isArray(m.badges)) m.badges = [];
+  if (typeof m.xp === 'undefined') m.xp = m.totalEarned || 0;
+  return m;
+}
+
 function normalizeData(data) {
   const normalized = data && typeof data === 'object' ? data : defaultData();
   normalized.settings = { ...defaultData().settings, ...(normalized.settings || {}) };
   normalized.family = normalized.family || { name:'Our Family', members:[] };
-  normalized.family.members = Array.isArray(normalized.family.members) ? normalized.family.members : [];
+  normalized.family.members = Array.isArray(normalized.family.members)
+    ? normalized.family.members.map(normalizeMember)
+    : [];
   normalized.chores = Array.isArray(normalized.chores) ? normalized.chores.map(normalizeChore) : [];
   normalized.prizes = Array.isArray(normalized.prizes) ? normalized.prizes : [];
   normalized.activities = Array.isArray(normalized.activities) ? normalized.activities : [];
@@ -2256,6 +2355,7 @@ function doCompleteChore(choreId, memberId, slotId = null, photoUrl = null, entr
     member.points      = (member.points      || 0) + chore.points;
     member.totalEarned = (member.totalEarned || 0) + chore.points;
     addHistory('chore', memberId, chore.title, chore.points);
+    checkAfterPointsAwarded(member, chore.points);
     saveData();
     return { approved: true, points: chore.points };
   } else {
@@ -2281,6 +2381,7 @@ function doApproveChore(choreId, memberId, entryId) {
     member.points      = (member.points      || 0) + chore.points;
     member.totalEarned = (member.totalEarned || 0) + chore.points;
     addHistory('chore', memberId, chore.title, chore.points);
+    checkAfterPointsAwarded(member, chore.points);
   }
   saveData();
 }
@@ -2338,6 +2439,269 @@ function goalTotal() {
 function addHistory(type, memberId, title, points) {
   D.history.unshift({ id:genId(), type, memberId, title, points, date:today() });
   if (D.history.length > 80) D.history.pop();
+}
+
+// ── LEVELS & BADGES ──────────────────────────────────────────
+const DEFAULT_LEVELS = [
+  { level:1, name:'Rookie',  icon:'🌱', minXp:0    },
+  { level:2, name:'Helper',  icon:'⭐', minXp:50   },
+  { level:3, name:'Star',    icon:'🌟', minXp:150  },
+  { level:4, name:'Champ',   icon:'🏆', minXp:300  },
+  { level:5, name:'Legend',  icon:'🔥', minXp:500  },
+  { level:6, name:'Hero',    icon:'🦸', minXp:800  },
+  { level:7, name:'Master',  icon:'👑', minXp:1200 },
+];
+
+const BADGE_DEFS = [
+  { id:'first_chore',  icon:'✅', name:'First Chore',    desc:'Complete your very first chore' },
+  { id:'streak_3',     icon:'🔥', name:'On a Roll',      desc:'3-day streak' },
+  { id:'streak_7',     icon:'🌊', name:'Week Warrior',   desc:'7-day streak' },
+  { id:'streak_14',    icon:'💪', name:'Unstoppable',    desc:'14-day streak' },
+  { id:'streak_30',    icon:'🏅', name:'Monthly Hero',   desc:'30-day streak' },
+  { id:'pts_50',       icon:'⭐', name:'Point Collector', desc:'Earn 50 points total' },
+  { id:'pts_200',      icon:'🌟', name:'Point Hoarder',  desc:'Earn 200 points total' },
+  { id:'pts_500',      icon:'💰', name:'Point Mogul',    desc:'Earn 500 points total' },
+  { id:'pts_1000',     icon:'💎', name:'Diamond Club',   desc:'Earn 1000 points total' },
+  { id:'level_up',     icon:'🚀', name:'Level Up!',      desc:'Reach level 2 or higher' },
+  { id:'level_master', icon:'👑', name:'Master Level',   desc:'Reach level 7 (Master)' },
+];
+
+function getMemberLevel(member) {
+  const xp = member.xp || member.totalEarned || 0;
+  let current = DEFAULT_LEVELS[0];
+  for (const lvl of DEFAULT_LEVELS) {
+    if (xp >= lvl.minXp) current = lvl;
+  }
+  const nextIdx = DEFAULT_LEVELS.findIndex(l => l.level === current.level + 1);
+  const next = nextIdx >= 0 ? DEFAULT_LEVELS[nextIdx] : null;
+  const xpIntoLevel = next ? xp - current.minXp : 0;
+  const xpNeeded    = next ? next.minXp - current.minXp : 1;
+  const pct         = next ? Math.min(100, Math.round(xpIntoLevel / xpNeeded * 100)) : 100;
+  return { current, next, xp, xpIntoLevel, xpNeeded, pct };
+}
+
+function awardBadgeIfNew(member, badgeId) {
+  if (!Array.isArray(member.badges)) member.badges = [];
+  if (member.badges.includes(badgeId)) return false;
+  member.badges.push(badgeId);
+  const def = BADGE_DEFS.find(b => b.id === badgeId);
+  if (def) toast(`${def.icon} Badge unlocked: ${def.name}!`);
+  return true;
+}
+
+function checkPointBadges(member) {
+  const xp = member.xp || member.totalEarned || 0;
+  if (xp >= 50)   awardBadgeIfNew(member, 'pts_50');
+  if (xp >= 200)  awardBadgeIfNew(member, 'pts_200');
+  if (xp >= 500)  awardBadgeIfNew(member, 'pts_500');
+  if (xp >= 1000) awardBadgeIfNew(member, 'pts_1000');
+}
+
+function checkLevelUp(member, prevLevel) {
+  if (!D.settings.levelingEnabled) return;
+  const { current } = getMemberLevel(member);
+  if (current.level > prevLevel) {
+    awardBadgeIfNew(member, 'level_up');
+    if (current.level === 7) awardBadgeIfNew(member, 'level_master');
+    toast(`${current.icon} Level up! ${member.name} is now ${current.name}!`);
+  }
+}
+
+function updateStreak(member) {
+  if (!D.settings.streakEnabled) return 0;
+  const t = today();
+  const st = member.streak || { current:0, best:0, lastDate:null };
+  let bonus = 0;
+  if (st.lastDate === t) {
+    // Already counted today
+  } else if (st.lastDate && dateDiffDays(st.lastDate, t) === 1) {
+    st.current += 1;
+    st.best = Math.max(st.best, st.current);
+    bonus = getStreakBonus(st.current);
+  } else {
+    // Reset streak (gap > 1 day)
+    st.current = 1;
+    st.best = Math.max(st.best, 1);
+  }
+  st.lastDate = t;
+  member.streak = st;
+
+  // Badge checks
+  if (st.current >= 3)  awardBadgeIfNew(member, 'streak_3');
+  if (st.current >= 7)  awardBadgeIfNew(member, 'streak_7');
+  if (st.current >= 14) awardBadgeIfNew(member, 'streak_14');
+  if (st.current >= 30) awardBadgeIfNew(member, 'streak_30');
+  return bonus;
+}
+
+function dateDiffDays(dateStr1, dateStr2) {
+  // Both "YYYY-MM-DD"
+  const d1 = new Date(dateStr1 + 'T00:00:00');
+  const d2 = new Date(dateStr2 + 'T00:00:00');
+  return Math.round((d2 - d1) / 86400000);
+}
+
+function getStreakBonus(streakCount) {
+  const s = D.settings;
+  if (streakCount >= 30) return s.streakBonus30 || 10;
+  if (streakCount >= 14) return s.streakBonus14 || 5;
+  if (streakCount >= 7)  return s.streakBonus7  || 3;
+  if (streakCount >= 3)  return s.streakBonus3  || 1;
+  return 0;
+}
+
+function checkAfterPointsAwarded(member, pts) {
+  // Called after points are added to member. Updates XP, level, streak, badges.
+  if (!member) return;
+  normalizeMember(member);
+  const s = D.settings;
+  const prevLevel = getMemberLevel(member).current.level;
+
+  // Update XP
+  if (s.levelingEnabled) {
+    member.xp = (member.xp || 0) + pts;
+  }
+
+  // Streak
+  let streakBonus = 0;
+  if (s.streakEnabled) {
+    streakBonus = updateStreak(member);
+    if (streakBonus > 0) {
+      member.points      = (member.points      || 0) + streakBonus;
+      member.totalEarned = (member.totalEarned || 0) + streakBonus;
+      member.xp          = (member.xp          || 0) + streakBonus;
+      addHistory('chore', member.id, `🔥 Streak bonus (${member.streak.current} days)`, streakBonus);
+      toast(`🔥 ${member.streak.current}-day streak! +${streakBonus} bonus pts`);
+    }
+  }
+
+  // First chore badge
+  awardBadgeIfNew(member, 'first_chore');
+  checkPointBadges(member);
+  if (s.levelingEnabled) checkLevelUp(member, prevLevel);
+}
+
+// ── NOT LISTENING ─────────────────────────────────────────────
+let _nlState = {
+  isHolding: false, holdStart: null, accumulated: 0, pointsLost: 0,
+  selectedKids: [], rafId: null,
+};
+
+function showNotListening() {
+  const kids = D.family.members.filter(m => m.role === 'kid');
+  _nlState = { isHolding: false, holdStart: null, accumulated: 0, pointsLost: 0,
+    selectedKids: kids.length === 1 ? [kids[0].id] : [], rafId: null };
+
+  const root = document.getElementById('nl-root');
+  root.classList.add('open');
+  _renderNL();
+}
+
+function _renderNL() {
+  const kids = D.family.members.filter(m => m.role === 'kid');
+  const st = _nlState;
+  const secsPerPt = D.settings.notListeningSecs || 60;
+  const totalSecs = Math.floor(st.accumulated / 1000);
+  const mins = String(Math.floor(totalSecs / 60)).padStart(2,'0');
+  const secs = String(totalSecs % 60).padStart(2,'0');
+
+  document.getElementById('nl-root').innerHTML = `
+    <div class="nl-title">🔇 You're Not Listening</div>
+    <div class="nl-timer" id="nl-timer">${mins}:${secs}</div>
+    <div class="nl-pts-lost" id="nl-pts">${st.pointsLost > 0 ? `−${st.pointsLost} pts so far` : 'Hold the button to deduct points'}</div>
+    <div class="nl-kids">
+      ${kids.map(k => `
+        <div class="nl-kid-chip ${st.selectedKids.includes(k.id)?'selected':''}"
+             onclick="_nlToggleKid('${k.id}')">
+          ${k.avatar||'🙂'} ${esc(k.name)}
+        </div>`).join('')}
+    </div>
+    <button class="nl-hold-btn ${st.isHolding?'holding':''}" id="nl-btn"
+      onmousedown="_nlHoldStart()" onmouseup="_nlHoldEnd()" onmouseleave="_nlHoldEnd()"
+      ontouchstart="_nlHoldStart(event)" ontouchend="_nlHoldEnd(event)" ontouchcancel="_nlHoldEnd(event)">
+      <span class="nl-hold-btn-text">${st.isHolding ? 'RUNNING' : 'HOLD'}</span>
+      <span class="nl-hold-hint">${st.isHolding ? 'Release to pause' : 'Hold to penalize'}</span>
+    </button>
+    <div class="nl-actions">
+      <button class="nl-btn-cancel" onclick="_nlCancel()">Cancel</button>
+      <button class="nl-btn-done"   onclick="_nlDone()">Apply & Done</button>
+    </div>`;
+}
+
+function _nlToggleKid(kidId) {
+  const i = _nlState.selectedKids.indexOf(kidId);
+  if (i >= 0) _nlState.selectedKids.splice(i, 1);
+  else _nlState.selectedKids.push(kidId);
+  _renderNL();
+}
+
+function _nlHoldStart(evt) {
+  if (evt) evt.preventDefault();
+  if (_nlState.isHolding) return;
+  _nlState.isHolding = true;
+  _nlState.holdStart = Date.now();
+  _renderNL();
+  _nlTick();
+}
+
+function _nlHoldEnd(evt) {
+  if (evt) evt.preventDefault();
+  if (!_nlState.isHolding) return;
+  _nlState.accumulated += Date.now() - _nlState.holdStart;
+  _nlState.isHolding = false;
+  _nlState.holdStart = null;
+  if (_nlState.rafId) { cancelAnimationFrame(_nlState.rafId); _nlState.rafId = null; }
+  _nlUpdateDisplay();
+  _renderNL();
+}
+
+function _nlTick() {
+  if (!_nlState.isHolding) return;
+  _nlUpdateDisplay();
+  _nlState.rafId = requestAnimationFrame(_nlTick);
+}
+
+function _nlUpdateDisplay() {
+  const secsPerPt = D.settings.notListeningSecs || 60;
+  const elapsed = _nlState.accumulated + (_nlState.isHolding ? Date.now() - _nlState.holdStart : 0);
+  const totalSecs = Math.floor(elapsed / 1000);
+  const mins = String(Math.floor(totalSecs / 60)).padStart(2,'0');
+  const secs = String(totalSecs % 60).padStart(2,'0');
+  _nlState.pointsLost = Math.floor(elapsed / 1000 / secsPerPt);
+
+  const timerEl = document.getElementById('nl-timer');
+  const ptsEl   = document.getElementById('nl-pts');
+  if (timerEl) timerEl.textContent = `${mins}:${secs}`;
+  if (ptsEl) ptsEl.textContent = _nlState.pointsLost > 0
+    ? `−${_nlState.pointsLost} pts so far`
+    : 'Hold the button to deduct points';
+}
+
+function _nlCancel() {
+  if (_nlState.rafId) cancelAnimationFrame(_nlState.rafId);
+  _nlState = { isHolding:false, holdStart:null, accumulated:0, pointsLost:0, selectedKids:[], rafId:null };
+  document.getElementById('nl-root').classList.remove('open');
+  document.getElementById('nl-root').innerHTML = '';
+}
+
+function _nlDone() {
+  if (_nlState.isHolding) _nlHoldEnd();
+  const pts = _nlState.pointsLost;
+  if (pts > 0 && _nlState.selectedKids.length > 0) {
+    _nlState.selectedKids.forEach(kidId => {
+      const m = getMember(kidId);
+      if (!m) return;
+      m.points = Math.max(0, (m.points || 0) - pts);
+      addHistory('penalty', kidId, `🔇 Not listening penalty`, -pts);
+    });
+    saveData();
+    const names = _nlState.selectedKids.map(id => getMember(id)?.name).filter(Boolean).join(' & ');
+    toast(`🔇 Deducted ${pts} pts from ${names}`);
+    renderParentHome();
+    renderParentHeader();
+    renderParentNav();
+  }
+  _nlCancel();
 }
 
 // ── TEXT-TO-SPEECH ────────────────────────────────────────────
@@ -3010,12 +3374,21 @@ function renderKidHeader() {
   const m = S.currentUser;
   if (!m) return;
   const pts = m.points || 0;
+  normalizeMember(m);
+  const { current: lvl } = getMemberLevel(m);
+  const streak = m.streak?.current || 0;
+  const showLevel  = D.settings.levelingEnabled !== false;
+  const showStreak = D.settings.streakEnabled !== false && streak >= 1;
   document.getElementById('kid-header').innerHTML = `
     <div class="header-left">
       <span class="header-avatar">${m.avatar||'🙂'}</span>
       <div>
         <div class="header-name">Hi, ${esc(m.name)}!</div>
-        <div class="header-sub">${todayDisplay()}</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:3px">
+          ${showLevel  ? `<span class="header-level-badge">${lvl.icon} ${lvl.name}</span>` : ''}
+          ${showStreak ? `<span class="header-streak-badge">🔥 ${streak} day streak</span>` : ''}
+          ${!showLevel && !showStreak ? `<div class="header-sub">${todayDisplay()}</div>` : ''}
+        </div>
       </div>
     </div>
     <div class="header-actions">
@@ -3461,6 +3834,7 @@ function renderKidPoints() {
   const pts = m.points || 0;
   const tot = m.totalEarned || 0;
   const sav = m.savings || 0;
+  normalizeMember(m);
 
   // Cheapest prize they can afford
   const nextPrize = D.prizes
@@ -3475,6 +3849,52 @@ function renderKidPoints() {
       <div class="stat-card"><div class="stat-val">${pts}</div><div class="stat-label">⭐ Points</div></div>
       <div class="stat-card"><div class="stat-val">${tot}</div><div class="stat-label">🏆 All Time</div></div>
       <div class="stat-card"><div class="stat-val">${D.settings.currency||'$'}${sav.toFixed(2)}</div><div class="stat-label">💰 Savings</div></div>
+    </div>`;
+
+  // Level progress banner
+  if (D.settings.levelingEnabled !== false) {
+    const { current: lvl, next, xpIntoLevel, xpNeeded, pct } = getMemberLevel(m);
+    html += `
+      <div class="level-banner">
+        <div class="level-banner-icon">${lvl.icon}</div>
+        <div class="level-banner-info">
+          <div class="level-banner-name">Level ${lvl.level}: ${lvl.name}</div>
+          ${next
+            ? `<div class="level-banner-sub">${xpIntoLevel} / ${xpNeeded} XP to ${next.name} ${next.icon}</div>
+               <div class="level-xp-bar"><div class="level-xp-fill" style="width:${pct}%"></div></div>`
+            : `<div class="level-banner-sub">🏆 Max level reached!</div>
+               <div class="level-xp-bar"><div class="level-xp-fill" style="width:100%"></div></div>`}
+        </div>
+      </div>`;
+  }
+
+  // Streak row
+  if (D.settings.streakEnabled !== false) {
+    const streak = m.streak?.current || 0;
+    const best   = m.streak?.best    || 0;
+    html += `
+      <div class="streak-row">
+        <div class="streak-flame">🔥</div>
+        <div class="streak-info">
+          <div class="streak-count">${streak}-day streak</div>
+          <div class="streak-label">Best: ${best} days · Keep going!</div>
+        </div>
+      </div>`;
+  }
+
+  // Badge grid
+  const earned = Array.isArray(m.badges) ? m.badges : [];
+  html += `
+    <div class="card">
+      <div class="card-title">🏅 Badges</div>
+      <div class="badge-grid">
+        ${BADGE_DEFS.map(b => {
+          const have = earned.includes(b.id);
+          return `<div class="badge-chip ${have?'earned':'badge-chip-locked'}" title="${b.desc}">
+            <span class="badge-chip-icon">${b.icon}</span>${b.name}
+          </div>`;
+        }).join('')}
+      </div>
     </div>`;
 
   if (nextPrize) {
@@ -3511,7 +3931,7 @@ function renderKidPoints() {
       const pos = h.points > 0;
       html += `
         <div class="history-item">
-          <span class="history-icon">${h.type==='chore'?'✅':h.type==='prize'?'🎁':'🎯'}</span>
+          <span class="history-icon">${h.type==='chore'?'✅':h.type==='prize'?'🎁':h.type==='penalty'?'🔇':'🎯'}</span>
           <div class="history-info">
             <div class="history-title">${esc(h.title)}</div>
             <div class="history-date">${fmtDate(h.date)}</div>
@@ -3965,6 +4385,8 @@ function renderParentHome() {
         <button class="btn btn-pink   btn-sm" onclick="showPrizeModal()">+ Add Prize</button>
         <button class="btn btn-teal   btn-sm" onclick="showGoalModal()">🎯 Set Goal</button>
         <button class="btn btn-warning btn-sm" onclick="showActivityModal()">+ Plan Event</button>
+        <button class="btn btn-danger  btn-sm" style="grid-column:span 2;background:#EF4444;color:#fff;font-size:1rem;padding:14px"
+                onclick="showNotListening()">🔇 You're Not Listening</button>
       </div>
     </div>`;
 
@@ -4012,6 +4434,7 @@ function parentMarkChoreDone(choreId, memberId) {
   member.points      = (member.points      || 0) + chore.points;
   member.totalEarned = (member.totalEarned || 0) + chore.points;
   addHistory('chore', memberId, chore.title, chore.points);
+  checkAfterPointsAwarded(member, chore.points);
   saveData();
   toast(`✅ Marked "${chore.title}" done for ${member.name} (+${chore.points} pts)`);
   renderParentHome();
@@ -4845,6 +5268,57 @@ function renderParentSettings() {
           </div>
         </div>`).join('')}
       <button class="btn btn-secondary btn-sm btn-full mt-8" onclick="goSetup()">Edit Family Setup</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🎮 Levels &amp; Streaks</div>
+      <div class="toggle-row">
+        <div><div class="toggle-label">Enable leveling system</div>
+          <div class="toggle-sub">Kids earn XP and unlock level titles</div></div>
+        <label class="toggle">
+          <input type="checkbox" id="s-leveling" ${s.levelingEnabled!==false?'checked':''} onchange="saveSetting('levelingEnabled',this.checked)">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        <div><div class="toggle-label">Enable streak bonuses</div>
+          <div class="toggle-sub">Consecutive days earn bonus points</div></div>
+        <label class="toggle">
+          <input type="checkbox" id="s-streak" ${s.streakEnabled!==false?'checked':''} onchange="saveSetting('streakEnabled',this.checked)">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div style="margin-top:12px;font-size:0.82rem;color:var(--muted);font-weight:600;margin-bottom:6px">Streak bonus points</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="form-group mb-0">
+          <label class="form-label">3-day bonus</label>
+          <input type="number" value="${s.streakBonus3||1}" min="0" onchange="saveSetting('streakBonus3',parseInt(this.value)||0)">
+        </div>
+        <div class="form-group mb-0">
+          <label class="form-label">7-day bonus</label>
+          <input type="number" value="${s.streakBonus7||3}" min="0" onchange="saveSetting('streakBonus7',parseInt(this.value)||0)">
+        </div>
+        <div class="form-group mb-0">
+          <label class="form-label">14-day bonus</label>
+          <input type="number" value="${s.streakBonus14||5}" min="0" onchange="saveSetting('streakBonus14',parseInt(this.value)||0)">
+        </div>
+        <div class="form-group mb-0">
+          <label class="form-label">30-day bonus</label>
+          <input type="number" value="${s.streakBonus30||10}" min="0" onchange="saveSetting('streakBonus30',parseInt(this.value)||0)">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🔇 Not Listening</div>
+      <p style="font-size:0.85rem;color:var(--muted);margin-bottom:14px">
+        Hold the big red button on the parent dashboard to accumulate time. When you release, seconds convert to point deductions.
+      </p>
+      <div class="form-group">
+        <label class="form-label">Seconds per point lost (default: 60)</label>
+        <input type="number" value="${s.notListeningSecs||60}" min="1"
+               onchange="saveSetting('notListeningSecs',parseInt(this.value)||60)">
+      </div>
     </div>
 
     <div class="card" style="border:2px solid #FEE2E2">
