@@ -876,6 +876,48 @@
     .chore-checkbox-icon { font-size: 1.5rem; }
     .chore-checkbox-label { flex: 1; font-weight: 600; font-size: 0.9rem; }
     .chore-checkbox-pts   { font-size: 0.78rem; color: var(--muted); }
+    .schedule-help {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+    .schedule-day-grid {
+      display: grid;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .schedule-day-row {
+      display: grid;
+      grid-template-columns: minmax(86px, 110px) 1fr;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: #F9FAFB;
+      border: 1px solid var(--border);
+    }
+    .schedule-day-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+    }
+    .schedule-day-toggle input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--purple); }
+    .schedule-day-hours {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 8px;
+      align-items: center;
+    }
+    .schedule-day-hours span {
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-align: center;
+    }
+    .schedule-day-hours input:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
 
     /* ══════════════════════════════════════════
        CELEBRATION OVERLAY
@@ -1416,6 +1458,18 @@ const DEFAULT_PRIZES = [
   { title:'Bowling Night',           icon:'🎳', cost:800, type:'family'     },
 ];
 
+const WEEKDAY_OPTIONS = [
+  { value:0, label:'Sun' },
+  { value:1, label:'Mon' },
+  { value:2, label:'Tue' },
+  { value:3, label:'Wed' },
+  { value:4, label:'Thu' },
+  { value:5, label:'Fri' },
+  { value:6, label:'Sat' },
+];
+
+const ALL_DAYS = WEEKDAY_OPTIONS.map(day => day.value);
+
 // ── APP STATE ────────────────────────────────────────────────
 let D = {};          // the live data object (mirrors localStorage)
 let S = {            // UI state (not persisted)
@@ -1435,7 +1489,7 @@ let S = {            // UI state (not persisted)
 // ── DEFAULT DATA ──────────────────────────────────────────────
 function defaultData() {
   return {
-    v: 2,
+    v: 3,
     setup: false,
     settings: {
       parentPin:       '',
@@ -1460,9 +1514,9 @@ let firestoreUnsub = null;
 function loadData() {
   try {
     const raw = localStorage.getItem(LS_KEY);
-    D = raw ? JSON.parse(raw) : defaultData();
+    D = normalizeData(raw ? JSON.parse(raw) : defaultData());
   } catch(e) {
-    D = defaultData();
+    D = normalizeData(defaultData());
   }
 }
 
@@ -1491,8 +1545,9 @@ function subscribeToFirestore(onFirstLoad) {
   firestoreUnsub = db.doc(FAMILY_DOC).onSnapshot(snap => {
     if (snap.exists) {
       const incoming = snap.data();
-      if (JSON.stringify(incoming) !== JSON.stringify(D)) {
-        D = incoming;
+      const normalizedIncoming = normalizeData(incoming);
+      if (JSON.stringify(normalizedIncoming) !== JSON.stringify(D)) {
+        D = normalizedIncoming;
         try { localStorage.setItem(LS_KEY, JSON.stringify(D)); } catch(e) {}
       }
     }
@@ -1522,7 +1577,7 @@ function genId() {
 }
 
 function today() {
-  return new Date().toISOString().slice(0,10); // YYYY-MM-DD
+  return formatDateLocal(new Date());
 }
 
 function parseDateLocal(str) {
@@ -1561,7 +1616,204 @@ function weekStart() {
   const d   = new Date();
   const day = d.getDay();
   const diff = d.getDate() - day + (day===0 ? -6 : 1);
-  return new Date(d.setDate(diff)).toISOString().slice(0,10);
+  d.setDate(diff);
+  return formatDateLocal(d);
+}
+
+function nowMinutes() {
+  const date = new Date();
+  return date.getHours() * 60 + date.getMinutes();
+}
+
+function timeToMinutes(value) {
+  if (!value || !/^\d{2}:\d{2}$/.test(value)) return null;
+  const [hours, minutes] = value.split(':').map(Number);
+  return (hours * 60) + minutes;
+}
+
+function normalizeCompletionEntry(entry) {
+  return {
+    id: entry?.id || genId(),
+    status: entry?.status === 'pending' ? 'pending' : 'done',
+    date: entry?.date || today(),
+    createdAt: entry?.createdAt || Date.now(),
+  };
+}
+
+function normalizeCompletionEntries(value) {
+  if (Array.isArray(value)) return value.map(normalizeCompletionEntry);
+  if (value && typeof value === 'object' && ('status' in value || 'date' in value)) {
+    return [normalizeCompletionEntry(value)];
+  }
+  return [];
+}
+
+function normalizeChore(chore) {
+  const legacyFrequency = chore?.frequency || 'daily';
+  const legacyPeriod = legacyFrequency === 'weekly' ? 'week' : legacyFrequency === 'once' ? 'once' : 'day';
+  const schedule = chore?.schedule || {};
+  const period = ['day','week','once'].includes(schedule.period) ? schedule.period : legacyPeriod;
+  const targetCount = Math.max(1, parseInt(schedule.targetCount ?? chore?.repeatCount ?? 1, 10) || 1);
+  const daysOfWeek = Array.isArray(schedule.daysOfWeek) && schedule.daysOfWeek.length
+    ? schedule.daysOfWeek.map(Number).filter(day => ALL_DAYS.includes(day))
+    : ALL_DAYS.slice();
+  const windows = {};
+  const sourceWindows = schedule.windows && typeof schedule.windows === 'object' ? schedule.windows : {};
+  Object.keys(sourceWindows).forEach(key => {
+    const day = Number(key);
+    if (!ALL_DAYS.includes(day)) return;
+    const start = typeof sourceWindows[key]?.start === 'string' ? sourceWindows[key].start : '';
+    const end = typeof sourceWindows[key]?.end === 'string' ? sourceWindows[key].end : '';
+    if (start || end) windows[day] = { start, end };
+  });
+
+  const completions = {};
+  Object.entries(chore?.completions || {}).forEach(([memberId, entries]) => {
+    completions[memberId] = normalizeCompletionEntries(entries);
+  });
+
+  return {
+    ...chore,
+    frequency: period,
+    repeatCount: targetCount,
+    assignedTo: Array.isArray(chore?.assignedTo) ? chore.assignedTo : [],
+    description: chore?.description || '',
+    completions,
+    schedule: {
+      period,
+      targetCount,
+      daysOfWeek: period === 'once' ? [] : daysOfWeek,
+      windows,
+    },
+  };
+}
+
+function normalizeData(data) {
+  const normalized = data && typeof data === 'object' ? data : defaultData();
+  normalized.settings = { ...defaultData().settings, ...(normalized.settings || {}) };
+  normalized.family = normalized.family || { name:'Our Family', members:[] };
+  normalized.family.members = Array.isArray(normalized.family.members) ? normalized.family.members : [];
+  normalized.chores = Array.isArray(normalized.chores) ? normalized.chores.map(normalizeChore) : [];
+  normalized.prizes = Array.isArray(normalized.prizes) ? normalized.prizes : [];
+  normalized.activities = Array.isArray(normalized.activities) ? normalized.activities : [];
+  normalized.history = Array.isArray(normalized.history) ? normalized.history : [];
+  normalized.v = 3;
+  return normalized;
+}
+
+function getChoreSchedule(chore) {
+  return chore?.schedule || normalizeChore(chore).schedule;
+}
+
+function getChoreTimeWindow(chore, dayIndex) {
+  const schedule = getChoreSchedule(chore);
+  return schedule.windows?.[dayIndex] || { start:'', end:'' };
+}
+
+function formatDaysOfWeek(daysOfWeek) {
+  if (!Array.isArray(daysOfWeek) || !daysOfWeek.length) return 'no days selected';
+  if (daysOfWeek.length === 7) return 'every day';
+  return WEEKDAY_OPTIONS.filter(day => daysOfWeek.includes(day.value)).map(day => day.label).join(', ');
+}
+
+function formatTimeWindow(window) {
+  if (!window || (!window.start && !window.end)) return 'any time';
+  if (window.start && window.end) return `${window.start} - ${window.end}`;
+  if (window.start) return `after ${window.start}`;
+  return `before ${window.end}`;
+}
+
+function isWithinTimeWindow(window, minutes) {
+  if (!window || (!window.start && !window.end)) return true;
+  const start = timeToMinutes(window.start);
+  const end = timeToMinutes(window.end);
+  if (start == null && end == null) return true;
+  if (start != null && end != null) {
+    if (start <= end) return minutes >= start && minutes <= end;
+    return minutes >= start || minutes <= end;
+  }
+  if (start != null) return minutes >= start;
+  return minutes <= end;
+}
+
+function choreScheduleSummary(chore) {
+  const schedule = getChoreSchedule(chore);
+  if (schedule.period === 'once') return 'one-time';
+  const countLabel = schedule.period === 'week'
+    ? `${schedule.targetCount}x per week`
+    : `${schedule.targetCount}x per day`;
+  const daysLabel = formatDaysOfWeek(schedule.daysOfWeek);
+  const uniqueWindows = schedule.daysOfWeek
+    .map(day => formatTimeWindow(getChoreTimeWindow(chore, day)))
+    .filter((label, index, arr) => arr.indexOf(label) === index);
+  const timeLabel = uniqueWindows.length === 1 ? uniqueWindows[0] : 'custom hours';
+  return `${countLabel} · ${daysLabel} · ${timeLabel}`;
+}
+
+function getRelevantCompletionEntries(chore, memberId, dateStr = today()) {
+  const entries = normalizeCompletionEntries(chore?.completions?.[memberId]);
+  const schedule = getChoreSchedule(chore);
+  if (schedule.period === 'once') return entries;
+  if (schedule.period === 'week') {
+    const start = startOfWeekDate(dateStr);
+    const end = addDaysToDate(start, 6);
+    return entries.filter(entry => entry.date >= start && entry.date <= end);
+  }
+  return entries.filter(entry => entry.date === dateStr);
+}
+
+function getChoreProgress(chore, memberId, dateStr = today()) {
+  const schedule = getChoreSchedule(chore);
+  const entries = getRelevantCompletionEntries(chore, memberId, dateStr);
+  const doneCount = entries.filter(entry => entry.status === 'done').length;
+  const pendingCount = entries.filter(entry => entry.status === 'pending').length;
+  const completedCount = doneCount + pendingCount;
+  const dayIndex = parseDateLocal(dateStr).getDay();
+  const scheduledToday = schedule.period === 'once' ? true : schedule.daysOfWeek.includes(dayIndex);
+  const window = getChoreTimeWindow(chore, dayIndex);
+  const availableNow = schedule.period === 'once' ? true : scheduledToday && isWithinTimeWindow(window, nowMinutes());
+  const targetCount = schedule.period === 'once' ? 1 : (scheduledToday ? schedule.targetCount : 0);
+  const remainingCount = Math.max(0, targetCount - completedCount);
+  let status = 'none';
+  let availabilityText = '';
+
+  if (schedule.period === 'once') {
+    if (doneCount > 0) status = 'done';
+    else if (pendingCount > 0) status = 'pending';
+  } else if (!scheduledToday) {
+    status = 'unavailable';
+    availabilityText = `Available on ${formatDaysOfWeek(schedule.daysOfWeek)}`;
+  } else if (doneCount >= targetCount) {
+    status = 'done';
+  } else if (completedCount >= targetCount && pendingCount > 0) {
+    status = 'pending';
+  } else if (completedCount > 0) {
+    status = 'partial';
+  } else {
+    status = 'none';
+  }
+
+  if (!availabilityText && schedule.period !== 'once' && !availableNow) {
+    availabilityText = `Available ${formatTimeWindow(window)}`;
+  }
+
+  return {
+    schedule,
+    entries,
+    doneCount,
+    pendingCount,
+    completedCount,
+    targetCount,
+    remainingCount,
+    scheduledToday,
+    availableNow,
+    window,
+    status,
+    availabilityText,
+    canSubmit: schedule.period === 'once'
+      ? completedCount < 1
+      : scheduledToday && availableNow && remainingCount > 0,
+  };
 }
 
 function fmtDate(str) {
@@ -1594,10 +1846,10 @@ function isBirthday(member) {
 function pendingApprovals() {
   const arr = [];
   for (const chore of D.chores) {
-    for (const [mid, comp] of Object.entries(chore.completions || {})) {
-      if (comp && comp.status === 'pending' && comp.date === today()) {
-        arr.push({ chore, memberId: mid });
-      }
+    for (const [mid, entries] of Object.entries(chore.completions || {})) {
+      normalizeCompletionEntries(entries).forEach(entry => {
+        if (entry.status === 'pending') arr.push({ chore, memberId: mid, entry });
+      });
     }
   }
   return arr;
@@ -1605,55 +1857,59 @@ function pendingApprovals() {
 
 // ── CHORE STATUS ──────────────────────────────────────────────
 function choreStatus(chore, memberId) {
-  const comp = chore.completions?.[memberId];
-  if (!comp) return 'none';
-  const t = today();
-  const w = weekStart();
-  if (chore.frequency === 'daily') {
-    return comp.date === t ? comp.status : 'none';
-  } else if (chore.frequency === 'weekly') {
-    return comp.date >= w && comp.date <= t ? comp.status : 'none';
-  } else { // once
-    return comp.status || 'none';
-  }
+  return getChoreProgress(chore, memberId).status;
 }
 
 function doCompleteChore(choreId, memberId) {
   const chore  = D.chores.find(c => c.id === choreId);
   const member = getMember(memberId);
   if (!chore || !member) return null;
-  if (choreStatus(chore, memberId) !== 'none') return null;
+  const progress = getChoreProgress(chore, memberId);
+  if (!progress.canSubmit) {
+    return { error: progress.remainingCount === 0 ? 'This chore is already fully submitted for now.' : (progress.availabilityText || 'This chore is not available right now.') };
+  }
   if (!chore.completions) chore.completions = {};
+  chore.completions[memberId] = normalizeCompletionEntries(chore.completions[memberId]);
+
+  const completion = {
+    id: genId(),
+    status: D.settings.autoApprove ? 'done' : 'pending',
+    date: today(),
+    createdAt: Date.now(),
+  };
+  chore.completions[memberId].push(completion);
 
   if (D.settings.autoApprove) {
-    chore.completions[memberId] = { status:'done', date:today() };
     member.points      = (member.points      || 0) + chore.points;
     member.totalEarned = (member.totalEarned || 0) + chore.points;
     addHistory('chore', memberId, chore.title, chore.points);
     saveData();
     return { approved:true, points:chore.points };
   } else {
-    chore.completions[memberId] = { status:'pending', date:today() };
     saveData();
     return { approved:false };
   }
 }
 
-function doApproveChore(choreId, memberId) {
+function doApproveChore(choreId, memberId, entryId) {
   const chore  = D.chores.find(c => c.id === choreId);
   const member = getMember(memberId);
   if (!chore || !member) return;
-  chore.completions[memberId] = { status:'done', date:today() };
+  chore.completions[memberId] = normalizeCompletionEntries(chore.completions[memberId]);
+  const entry = chore.completions[memberId].find(item => item.id === entryId);
+  if (!entry) return;
+  entry.status = 'done';
   member.points      = (member.points      || 0) + chore.points;
   member.totalEarned = (member.totalEarned || 0) + chore.points;
   addHistory('chore', memberId, chore.title, chore.points);
   saveData();
 }
 
-function doRejectChore(choreId, memberId) {
+function doRejectChore(choreId, memberId, entryId) {
   const chore = D.chores.find(c => c.id === choreId);
   if (!chore) return;
-  if (chore.completions) delete chore.completions[memberId];
+  chore.completions[memberId] = normalizeCompletionEntries(chore.completions[memberId]).filter(entry => entry.id !== entryId);
+  if (!chore.completions[memberId].length) delete chore.completions[memberId];
   saveData();
 }
 
@@ -2273,7 +2529,14 @@ function setupNext() {
           title: c.title,
           icon:  c.icon,
           points: c.points,
-          frequency: c.frequency,
+          frequency: c.frequency === 'weekly' ? 'week' : c.frequency === 'once' ? 'once' : 'day',
+          repeatCount: 1,
+          schedule: {
+            period: c.frequency === 'weekly' ? 'week' : c.frequency === 'once' ? 'once' : 'day',
+            targetCount: 1,
+            daysOfWeek: c.frequency === 'once' ? [] : ALL_DAYS.slice(),
+            windows: {},
+          },
           assignedTo: kidMembers.map(k=>k.id),
           completions: {},
           description: '',
@@ -2424,20 +2687,24 @@ function renderKidChores() {
     return;
   }
 
-  const done    = myChores.filter(c => choreStatus(c,m.id)==='done');
-  const pending = myChores.filter(c => choreStatus(c,m.id)==='pending');
-  const todo    = myChores.filter(c => choreStatus(c,m.id)==='none');
+  const progressMap = new Map(myChores.map(chore => [chore.id, getChoreProgress(chore, m.id)]));
+  const done        = myChores.filter(c => progressMap.get(c.id)?.status === 'done');
+  const pending     = myChores.filter(c => ['pending','partial'].includes(progressMap.get(c.id)?.status));
+  const todo        = myChores.filter(c => progressMap.get(c.id)?.status === 'none');
+  const unavailable = myChores.filter(c => progressMap.get(c.id)?.status === 'unavailable');
 
-  const totalPts = myChores.reduce((s,c)=>s+c.points,0);
-  const earnedPts= done.reduce((s,c)=>s+c.points,0);
+  const totalUnits  = myChores.reduce((sum, chore) => sum + (progressMap.get(chore.id)?.targetCount || 0), 0);
+  const doneUnits   = myChores.reduce((sum, chore) => sum + (progressMap.get(chore.id)?.doneCount || 0), 0);
+  const totalPts    = myChores.reduce((sum, chore) => sum + ((progressMap.get(chore.id)?.targetCount || 0) * chore.points), 0);
+  const earnedPts   = myChores.reduce((sum, chore) => sum + ((progressMap.get(chore.id)?.doneCount || 0) * chore.points), 0);
   const pct      = totalPts>0 ? Math.round(earnedPts/totalPts*100) : 0;
 
   let html = `
     <div class="card" style="background:linear-gradient(135deg,${m.color||'#6C63FF'},${m.color||'#6C63FF'}dd);color:#fff;border-radius:18px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <div>
-          <div style="font-size:1.6rem;font-weight:800">${done.length} / ${myChores.length}</div>
-          <div style="opacity:0.85;font-size:0.85rem">chores done today</div>
+          <div style="font-size:1.6rem;font-weight:800">${doneUnits} / ${totalUnits || myChores.length}</div>
+          <div style="opacity:0.85;font-size:0.85rem">completions finished right now</div>
         </div>
         <div style="font-size:${tiny?'3rem':'2rem'}">${pct===100?'🏆':m.avatar||'⭐'}</div>
       </div>
@@ -2452,34 +2719,44 @@ function renderKidChores() {
     html += `<div class="card-title">📋 To Do</div>`;
     if (tiny) {
       html += `<div class="tiny-grid">`;
-      todo.forEach(c => { html += tinyChoreCard(c, m, 'none'); });
+      todo.forEach(c => { html += tinyChoreCard(c, m, progressMap.get(c.id)); });
       html += `</div>`;
     } else {
-      todo.forEach(c => { html += normalChoreCard(c, m, 'none'); });
+      todo.forEach(c => { html += normalChoreCard(c, m, progressMap.get(c.id)); });
     }
   }
 
-  // Pending
+  // Pending / partial
   if (pending.length > 0) {
-    html += `<div class="card-title mt-12">⏳ Waiting for Approval</div>`;
-    pending.forEach(c => { html += tiny ? tinyChoreCard(c,m,'pending') : normalChoreCard(c,m,'pending'); });
+    html += `<div class="card-title mt-12">⏳ In Progress</div>`;
+    pending.forEach(c => { html += tiny ? tinyChoreCard(c,m,progressMap.get(c.id)) : normalChoreCard(c,m,progressMap.get(c.id)); });
   }
 
   // Done
   if (done.length > 0) {
     html += `<div class="card-title mt-12">✅ Done Today</div>`;
-    done.forEach(c => { html += tiny ? tinyChoreCard(c,m,'done') : normalChoreCard(c,m,'done'); });
+    done.forEach(c => { html += tiny ? tinyChoreCard(c,m,progressMap.get(c.id)) : normalChoreCard(c,m,progressMap.get(c.id)); });
+  }
+
+  if (unavailable.length > 0) {
+    html += `<div class="card-title mt-12">🕒 Later</div>`;
+    unavailable.forEach(c => { html += tiny ? tinyChoreCard(c,m,progressMap.get(c.id)) : normalChoreCard(c,m,progressMap.get(c.id)); });
   }
 
   document.getElementById('kid-content').innerHTML = html;
 }
 
-function normalChoreCard(chore, member, status) {
+function normalChoreCard(chore, member, progress) {
+  const status = progress?.status || 'none';
+  const submitted = progress?.completedCount || 0;
+  const target = progress?.targetCount || (status === 'done' ? progress?.doneCount || 1 : 0);
   let btnHtml = '';
-  if (status==='none') {
-    btnHtml = `<button class="chore-btn chore-btn-do" onclick="kidCompleteChore('${chore.id}',event)">Done! ✓</button>`;
-  } else if (status==='pending') {
+  if (progress?.canSubmit) {
+    btnHtml = `<button class="chore-btn chore-btn-do" onclick="kidCompleteChore('${chore.id}',event)">${submitted>0?'Add one more ✓':'Done! ✓'}</button>`;
+  } else if (status==='pending' || status==='partial') {
     btnHtml = `<span class="chore-btn chore-btn-pending">⏳ Pending</span>`;
+  } else if (status==='unavailable') {
+    btnHtml = `<span class="chore-btn chore-btn-pending">🕒 Later</span>`;
   } else {
     btnHtml = `<span class="chore-btn chore-btn-done">✅ Done</span>`;
   }
@@ -2488,19 +2765,23 @@ function normalChoreCard(chore, member, status) {
       <span class="chore-icon">${chore.icon}</span>
       <div class="chore-info">
         <div class="chore-name">${esc(chore.title)}</div>
-        <div class="chore-meta">${fmtPts(chore.points)} · ${chore.frequency}</div>
+        <div class="chore-meta">${fmtPts(chore.points)} · ${esc(choreScheduleSummary(chore))}</div>
+        ${target>0?`<div class="chore-meta">${submitted}/${target} submitted${progress?.availabilityText?` · ${esc(progress.availabilityText)}`:''}</div>`:progress?.availabilityText?`<div class="chore-meta">${esc(progress.availabilityText)}</div>`:''}
       </div>
       <div class="chore-action">${btnHtml}</div>
     </div>`;
 }
 
-function tinyChoreCard(chore, member, status) {
+function tinyChoreCard(chore, member, progress) {
+  const status = progress?.status || 'none';
   const tts = `${chore.title}. Worth ${chore.points} stars!`;
   let btnHtml = '';
-  if (status==='none') {
-    btnHtml = `<button class="chore-btn chore-btn-do" onclick="kidCompleteChore('${chore.id}',event)" style="font-size:1.2rem;padding:14px 20px">✓ Done!</button>`;
-  } else if (status==='pending') {
+  if (progress?.canSubmit) {
+    btnHtml = `<button class="chore-btn chore-btn-do" onclick="kidCompleteChore('${chore.id}',event)" style="font-size:1.2rem;padding:14px 20px">✓ ${progress.completedCount>0?'Again!':'Done!'}</button>`;
+  } else if (status==='pending' || status==='partial') {
     btnHtml = `<span class="chore-btn chore-btn-pending" style="font-size:1rem">⏳ Waiting...</span>`;
+  } else if (status==='unavailable') {
+    btnHtml = `<span class="chore-btn chore-btn-pending" style="font-size:1rem">🕒 Later</span>`;
   } else {
     btnHtml = `<span class="chore-btn chore-btn-done" style="font-size:1rem">⭐ Done!</span>`;
   }
@@ -2509,6 +2790,8 @@ function tinyChoreCard(chore, member, status) {
       <span class="chore-icon" style="font-size:4rem">${chore.icon}</span>
       <div class="chore-name" style="font-size:1.2rem">${esc(chore.title)}</div>
       <div class="chore-meta">⭐ ${chore.points} stars</div>
+      ${progress?.targetCount?`<div class="chore-meta">${progress.completedCount}/${progress.targetCount} done</div>`:''}
+      ${progress?.availabilityText?`<div class="chore-meta">${esc(progress.availabilityText)}</div>`:''}
       ${btnHtml}
     </div>`;
 }
@@ -2519,6 +2802,11 @@ function kidCompleteChore(choreId, evt) {
   if (!m) return;
   const result = doCompleteChore(choreId, m.id);
   if (!result) return;
+  if (result.error) {
+    toast(result.error);
+    if (isTiny(m)) speak(result.error);
+    return;
+  }
 
   const chore = D.chores.find(c=>c.id===choreId);
   if (!result.approved) {
@@ -2948,7 +3236,7 @@ function renderParentHome() {
   if (pending.length > 0) {
     html += `<div class="card" style="border:2px solid var(--yellow)">
       <div class="card-title">⏳ Needs Approval</div>`;
-    pending.forEach(({chore, memberId}) => {
+    pending.forEach(({chore, memberId, entry}) => {
       const mem = getMember(memberId);
       if (!mem) return;
       html += `
@@ -2956,11 +3244,11 @@ function renderParentHome() {
           <span class="admin-icon">${chore.icon}</span>
           <div class="admin-info">
             <div class="admin-name">${esc(chore.title)}</div>
-            <div class="admin-meta">${mem.avatar} ${esc(mem.name)} · +${chore.points} pts</div>
+            <div class="admin-meta">${mem.avatar} ${esc(mem.name)} · +${chore.points} pts · ${fmtDate(entry.date)}</div>
           </div>
           <div class="admin-actions">
-            <button class="btn-icon-sm btn-icon-approve" onclick="approveChore('${chore.id}','${memberId}')">✓</button>
-            <button class="btn-icon-sm btn-icon-reject"  onclick="rejectChore('${chore.id}','${memberId}')">✕</button>
+            <button class="btn-icon-sm btn-icon-approve" onclick="approveChore('${chore.id}','${memberId}','${entry.id}')">✓</button>
+            <button class="btn-icon-sm btn-icon-reject"  onclick="rejectChore('${chore.id}','${memberId}','${entry.id}')">✕</button>
           </div>
         </div>`;
     });
@@ -2990,19 +3278,19 @@ function renderParentHome() {
   kids.forEach(kid => {
     const myChores  = D.chores.filter(c=>c.assignedTo?.includes(kid.id));
     const doneCount = myChores.filter(c=>choreStatus(c,kid.id)==='done').length;
-    const pendCount = myChores.filter(c=>choreStatus(c,kid.id)==='pending').length;
+    const pendCount = myChores.filter(c=>['pending','partial'].includes(choreStatus(c,kid.id))).length;
     const pct       = myChores.length>0 ? Math.round(doneCount/myChores.length*100) : 0;
     const choreRows = myChores.length === 0
       ? `<div class="empty-state" style="padding:16px 8px"><div class="empty-text">No chores assigned</div></div>`
       : `<div class="kid-overview-list">${myChores.map(chore => {
           const status = choreStatus(chore, kid.id);
-          const statusClass = status === 'done' ? 'done' : status === 'pending' ? 'pending' : 'todo';
-          const statusLabel = status === 'done' ? 'Done' : status === 'pending' ? 'Pending' : 'To do';
+          const statusClass = status === 'done' ? 'done' : ['pending','partial'].includes(status) ? 'pending' : 'todo';
+          const statusLabel = status === 'done' ? 'Done' : ['pending','partial'].includes(status) ? 'In progress' : status === 'unavailable' ? 'Later' : 'To do';
           return `
             <div class="kid-overview-item">
               <div>
                 <div style="font-weight:700">${chore.icon} ${esc(chore.title)}</div>
-                <div style="font-size:0.82rem;color:var(--muted)">${fmtPts(chore.points)} · ${esc(chore.frequency)}</div>
+                <div style="font-size:0.82rem;color:var(--muted)">${fmtPts(chore.points)} · ${esc(choreScheduleSummary(chore))}</div>
               </div>
               <span class="kid-overview-status ${statusClass}">${statusLabel}</span>
             </div>`;
@@ -3048,8 +3336,8 @@ function renderParentHome() {
   document.getElementById('parent-content').innerHTML = html;
 }
 
-function approveChore(choreId, memberId) {
-  doApproveChore(choreId, memberId);
+function approveChore(choreId, memberId, entryId) {
+  doApproveChore(choreId, memberId, entryId);
   const m = getMember(memberId);
   const c = D.chores.find(x=>x.id===choreId);
   toast(`✅ Approved "${c?.title}" for ${m?.name} (+${c?.points} pts)`);
@@ -3058,8 +3346,8 @@ function approveChore(choreId, memberId) {
   renderParentNav();
 }
 
-function rejectChore(choreId, memberId) {
-  doRejectChore(choreId, memberId);
+function rejectChore(choreId, memberId, entryId) {
+  doRejectChore(choreId, memberId, entryId);
   const m = getMember(memberId);
   toast(`Rejected chore for ${m?.name}`);
   renderParentHome();
@@ -3087,7 +3375,7 @@ function renderParentChores() {
         <span class="admin-icon">${chore.icon}</span>
         <div class="admin-info">
           <div class="admin-name">${esc(chore.title)}</div>
-          <div class="admin-meta">${fmtPts(chore.points)} · ${chore.frequency} · ${assignedKids||'no one'}</div>
+          <div class="admin-meta">${fmtPts(chore.points)} · ${esc(choreScheduleSummary(chore))} · ${assignedKids||'no one'}</div>
         </div>
         <div class="admin-actions">
           <button class="btn-icon-sm btn-icon-edit"   onclick="showChoreModal('${chore.id}')">✏️</button>
@@ -3102,7 +3390,11 @@ function renderParentChores() {
 function showChoreModal(choreId) {
   const kids  = D.family.members.filter(m=>m.role==='kid');
   const chore = choreId ? D.chores.find(c=>c.id===choreId) : null;
-  const c     = chore || { title:'', icon:'🛏️', points:10, frequency:'daily', assignedTo:kids.map(k=>k.id), description:'' };
+  const c     = normalizeChore(chore || {
+    title:'', icon:'🛏️', points:10, frequency:'day', repeatCount:1,
+    schedule: { period:'day', targetCount:1, daysOfWeek:ALL_DAYS.slice(), windows:{} },
+    assignedTo:kids.map(k=>k.id), description:'', completions:{}
+  });
 
   const iconOpts = CHORE_ICONS.map(ic =>
     `<div class="icon-opt${ic===c.icon?' sel':''}" onclick="selChoreIcon(this,'${ic}')">${ic}</div>`
@@ -3113,6 +3405,22 @@ function showChoreModal(choreId) {
       <span class="chore-checkbox-icon">${k.avatar}</span>
       <span class="chore-checkbox-label">${esc(k.name)}</span>
     </label>`).join('');
+  const scheduleRows = WEEKDAY_OPTIONS.map(day => {
+    const checked = c.schedule.period !== 'once' && c.schedule.daysOfWeek.includes(day.value);
+    const window = c.schedule.windows?.[day.value] || { start:'', end:'' };
+    return `
+      <div class="schedule-day-row">
+        <label class="schedule-day-toggle">
+          <input type="checkbox" id="cm-day-${day.value}" ${checked?'checked':''} onchange="toggleChoreDayRow(${day.value})">
+          <span>${day.label}</span>
+        </label>
+        <div class="schedule-day-hours">
+          <input type="time" id="cm-start-${day.value}" value="${window.start||''}" ${checked?'':'disabled'}>
+          <span>to</span>
+          <input type="time" id="cm-end-${day.value}" value="${window.end||''}" ${checked?'':'disabled'}>
+        </div>
+      </div>`;
+  }).join('');
 
   showModal(`
     <div class="modal-title">${chore?'Edit':'Add'} Chore</div>
@@ -3132,11 +3440,23 @@ function showChoreModal(choreId) {
       </div>
       <div class="form-group mb-0">
         <label class="form-label">Frequency</label>
-        <select id="cm-freq">
-          <option value="daily"  ${c.frequency==='daily'  ?'selected':''}>Daily</option>
-          <option value="weekly" ${c.frequency==='weekly' ?'selected':''}>Weekly</option>
-          <option value="once"   ${c.frequency==='once'   ?'selected':''}>One-time</option>
+        <select id="cm-freq" onchange="toggleChoreScheduleFields()">
+          <option value="day"  ${c.schedule.period==='day'  ?'selected':''}>Per day</option>
+          <option value="week" ${c.schedule.period==='week' ?'selected':''}>Per week</option>
+          <option value="once" ${c.schedule.period==='once' ?'selected':''}>One-time</option>
         </select>
+      </div>
+    </div>
+    <div id="cm-schedule-fields">
+      <div class="form-group">
+        <label class="form-label">Required completions</label>
+        <input type="number" id="cm-repeat" min="1" max="12" value="${c.schedule.targetCount||1}">
+        <div class="schedule-help">Use this for chores that need to happen more than once in the same day or week.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Available days and hours</label>
+        <div class="schedule-help">Leave the times blank for any time on that day. You can set different hours for each day.</div>
+        <div class="schedule-day-grid">${scheduleRows}</div>
       </div>
     </div>
     ${kids.length>0?`<div class="form-group"><label class="form-label">Assign to</label>${assignOpts}</div>`:''}
@@ -3148,6 +3468,7 @@ function showChoreModal(choreId) {
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveChore('${choreId||''}')">Save ✓</button>
     </div>`);
+  toggleChoreScheduleFields();
 }
 
 function selChoreIcon(el, icon) {
@@ -3156,21 +3477,79 @@ function selChoreIcon(el, icon) {
   el.classList.add('sel');
 }
 
+function toggleChoreScheduleFields() {
+  const freq = document.getElementById('cm-freq')?.value || 'day';
+  const wrap = document.getElementById('cm-schedule-fields');
+  if (!wrap) return;
+  wrap.style.display = freq === 'once' ? 'none' : 'block';
+}
+
+function toggleChoreDayRow(dayIndex) {
+  const enabled = document.getElementById(`cm-day-${dayIndex}`)?.checked;
+  const start = document.getElementById(`cm-start-${dayIndex}`);
+  const end = document.getElementById(`cm-end-${dayIndex}`);
+  if (start) start.disabled = !enabled;
+  if (end) end.disabled = !enabled;
+}
+
 function saveChore(choreId) {
   const title  = document.getElementById('cm-title')?.value.trim();
   const icon   = document.getElementById('cm-icon')?.value || '📋';
   const points = parseInt(document.getElementById('cm-points')?.value)||10;
-  const freq   = document.getElementById('cm-freq')?.value || 'daily';
+  const freq   = document.getElementById('cm-freq')?.value || 'day';
+  const repeatCount = Math.max(1, parseInt(document.getElementById('cm-repeat')?.value, 10) || 1);
   const desc   = document.getElementById('cm-desc')?.value.trim();
   const assigned = [...document.querySelectorAll('input[name=assign]:checked')].map(x=>x.value);
+  const daysOfWeek = freq === 'once' ? [] : WEEKDAY_OPTIONS.filter(day => document.getElementById(`cm-day-${day.value}`)?.checked).map(day => day.value);
+  const windows = {};
+
+  if (freq !== 'once' && daysOfWeek.length === 0) { toast('Select at least one day for this chore'); return; }
+  daysOfWeek.forEach(day => {
+    const start = document.getElementById(`cm-start-${day}`)?.value || '';
+    const end = document.getElementById(`cm-end-${day}`)?.value || '';
+    if (start || end) windows[day] = { start, end };
+  });
 
   if (!title) { toast('Enter a chore name'); return; }
 
   if (choreId) {
-    const c = D.chores.find(x=>x.id===choreId);
-    if (c) { Object.assign(c, { title, icon, points, frequency:freq, assignedTo:assigned, description:desc }); }
+    const index = D.chores.findIndex(x=>x.id===choreId);
+    if (index >= 0) {
+      D.chores[index] = normalizeChore({
+        ...D.chores[index],
+        title,
+        icon,
+        points,
+        frequency: freq,
+        repeatCount,
+        assignedTo: assigned,
+        description: desc,
+        schedule: {
+          period: freq,
+          targetCount: repeatCount,
+          daysOfWeek,
+          windows,
+        },
+      });
+    }
   } else {
-    D.chores.push({ id:genId(), title, icon, points, frequency:freq, assignedTo:assigned, description:desc, completions:{} });
+    D.chores.push(normalizeChore({
+      id:genId(),
+      title,
+      icon,
+      points,
+      frequency:freq,
+      repeatCount,
+      assignedTo:assigned,
+      description:desc,
+      completions:{},
+      schedule: {
+        period: freq,
+        targetCount: repeatCount,
+        daysOfWeek,
+        windows,
+      },
+    }));
   }
   saveData();
   closeModal();
