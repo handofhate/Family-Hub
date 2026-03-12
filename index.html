@@ -1866,6 +1866,7 @@ function defaultData() {
       streakBonus30:    10,
       // Not Listening
       notListeningSecs: 60,
+      sortPrizesByValue: false,
     },
     family: { name:'Our Family', members:[] },
     chores:     [],
@@ -4292,7 +4293,8 @@ function renderKidShop() {
   const m    = S.currentUser;
   const tiny = isTiny(m);
   const pts  = m.points || 0;
-  const indiv = D.prizes.filter(p => p.type === 'individual');
+  const sortFn = D.settings.sortPrizesByValue ? (a,b) => (a.cost||0)-(b.cost||0) : ()=>0;
+  const indiv = D.prizes.filter(p => p.type === 'individual').slice().sort(sortFn);
 
   if (indiv.length === 0) {
     document.getElementById('kid-content').innerHTML = `
@@ -4375,7 +4377,8 @@ function renderKidTeam() {
   const m    = S.currentUser;
   const tiny = isTiny(m);
   const pts  = m.points || 0;
-  const goals = D.teamGoals || [];
+  const sortFn = D.settings.sortPrizesByValue ? (a,b) => (a.targetPoints||0)-(b.targetPoints||0) : ()=>0;
+  const goals = (D.teamGoals || []).slice().sort(sortFn);
   const kids  = D.family.members.filter(k=>k.role==='kid');
 
   if (goals.length === 0) {
@@ -5561,7 +5564,8 @@ function deleteChore(choreId) {
 
 // ── PARENT PRIZES ─────────────────────────────────────────────
 function renderParentPrizes() {
-  const indiv = D.prizes.filter(p => p.type === 'individual');
+  const sortFn = D.settings.sortPrizesByValue ? (a,b) => (a.cost||a.targetPoints||0)-(b.cost||b.targetPoints||0) : ()=>0;
+  const indiv = D.prizes.filter(p => p.type === 'individual').slice().sort(sortFn);
   let html = `
     <div class="section-row">
       <span class="section-title">🎁 Individual Prizes (${indiv.length})</span>
@@ -5588,7 +5592,7 @@ function renderParentPrizes() {
   });
 
   // Team goals section
-  const goals = D.teamGoals || [];
+  const goals = (D.teamGoals || []).slice().sort(sortFn);
   html += `<div class="divider"></div>
     <div class="section-row">
       <span class="section-title">🏆 Team Prizes (${goals.length})</span>
@@ -6219,7 +6223,7 @@ function _advRender() {
     levelingEnabled:'Leveling enabled', streakEnabled:'Streaks enabled',
     streakBonus3:'Streak bonus (3d)', streakBonus7:'Streak bonus (7d)', streakBonus14:'Streak bonus (14d)', streakBonus30:'Streak bonus (30d)',
     notListeningSecs:'NL secs per point', currency:'Currency symbol', familyName:'Family name',
-    lastSync:'Last sync (auto)', comboEnabled:'Combo bonus enabled',
+    lastSync:'Last sync (auto)', comboEnabled:'Combo bonus enabled', sortPrizesByValue:'Sort prizes by value',
   };
   const settingsHtml = Object.entries(D.settings).map(([k, v]) => {
     const label = SETTING_LABELS[k] || k;
@@ -6341,6 +6345,14 @@ function renderParentSettings() {
           <div class="toggle-sub">Kids earn points instantly</div></div>
         <label class="toggle">
           <input type="checkbox" id="s-auto" ${s.autoApprove?'checked':''} onchange="saveSetting('autoApprove',this.checked)">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        <div><div class="toggle-label">Sort prizes by value</div>
+          <div class="toggle-sub">Lowest to highest cost in shop &amp; team tabs</div></div>
+        <label class="toggle">
+          <input type="checkbox" ${s.sortPrizesByValue?'checked':''} onchange="saveSetting('sortPrizesByValue',this.checked)">
           <span class="toggle-track"></span>
         </label>
       </div>
