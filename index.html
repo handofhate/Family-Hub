@@ -5954,7 +5954,27 @@ function advSetPrize(id, field, val) {
 
 function advDeleteHistory(entryId) {
   const idx = D.history.findIndex(h => h.id === entryId);
-  if (idx >= 0) { D.history.splice(idx, 1); saveData(); _advRender(); }
+  if (idx < 0) return;
+  D.history.splice(idx, 1);
+  saveData();
+  const row = document.querySelector(`[data-hist-id="${entryId}"]`);
+  if (row) row.remove();
+  _advRefreshStatus('Deleted');
+}
+
+function _advRenderPreserving() {
+  // Save scroll position and which sections are open
+  const body = document.querySelector('#adv-editor-root .adv-editor-body');
+  const scroll = body ? body.scrollTop : 0;
+  const openState = {};
+  document.querySelectorAll('#adv-editor-root details[id]').forEach(d => { openState[d.id] = d.open; });
+  _advRender();
+  // Restore
+  const newBody = document.querySelector('#adv-editor-root .adv-editor-body');
+  if (newBody) newBody.scrollTop = scroll;
+  document.querySelectorAll('#adv-editor-root details[id]').forEach(d => {
+    if (d.id in openState) d.open = openState[d.id];
+  });
 }
 
 function advApplyRawJson() {
@@ -5965,7 +5985,7 @@ function advApplyRawJson() {
     D = normalizeData(parsed);
     saveData();
     if (statusEl) { statusEl.className = 'adv-status ok'; statusEl.textContent = '✅ Applied & saved successfully'; }
-    _advRender();
+    _advRenderPreserving();
   } catch(e) {
     if (statusEl) { statusEl.className = 'adv-status err'; statusEl.textContent = `❌ JSON error: ${e.message}`; }
   }
@@ -6081,7 +6101,7 @@ function _advRender() {
         const mem = getMember(h.memberId);
         const ptsStr = (h.points||0) >= 0 ? `+${h.points}` : `${h.points}`;
         const ptsCol = (h.points||0) >= 0 ? '#166534' : '#991b1b';
-        return `<div class="adv-hist-row">
+        return `<div class="adv-hist-row" data-hist-id="${h.id}">
           <span style="width:20px;text-align:center">${typeIcon[h.type]||'📝'}</span>
           <span style="width:24px">${mem?.avatar||''}</span>
           <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(h.title)}</span>
@@ -6110,37 +6130,37 @@ function _advRender() {
     </div>
     <div class="adv-editor-body">
 
-      <details class="adv-section" open>
+      <details id="adv-sec-members" class="adv-section" open>
         <summary>👤 Members <span style="font-size:0.75rem;color:#9ca3af;font-weight:400;margin-left:4px">${members.length} total</span></summary>
         <div class="adv-section-body">${membersHtml}</div>
       </details>
 
-      <details class="adv-section">
+      <details id="adv-sec-chores" class="adv-section">
         <summary>📋 Chores <span style="font-size:0.75rem;color:#9ca3af;font-weight:400;margin-left:4px">${D.chores.length} total — edit icon, title, points</span></summary>
         <div class="adv-section-body">${choresHtml}</div>
       </details>
 
-      <details class="adv-section">
+      <details id="adv-sec-prizes" class="adv-section">
         <summary>🎁 Prizes <span style="font-size:0.75rem;color:#9ca3af;font-weight:400;margin-left:4px">${D.prizes.length} total — edit icon, title, cost</span></summary>
         <div class="adv-section-body">${prizesHtml}</div>
       </details>
 
-      <details class="adv-section">
+      <details id="adv-sec-settings" class="adv-section">
         <summary>⚙️ Settings <span style="font-size:0.75rem;color:#9ca3af;font-weight:400;margin-left:4px">all app settings</span></summary>
         <div class="adv-section-body">${settingsHtml}</div>
       </details>
 
-      <details class="adv-section">
+      <details id="adv-sec-goal" class="adv-section">
         <summary>🎯 Family Goal</summary>
         <div class="adv-section-body">${goalHtml}</div>
       </details>
 
-      <details class="adv-section">
+      <details id="adv-sec-history" class="adv-section">
         <summary>📜 History <span style="font-size:0.75rem;color:#9ca3af;font-weight:400;margin-left:4px">last 40 entries — tap ✕ to delete</span></summary>
         <div class="adv-section-body">${histHtml}</div>
       </details>
 
-      <details class="adv-section">
+      <details id="adv-sec-json" class="adv-section">
         <summary>🗂️ Raw JSON <span style="font-size:0.75rem;color:#9ca3af;font-weight:400;margin-left:4px">full database — edit with care</span></summary>
         <div class="adv-section-body">
           <p style="font-size:0.8rem;color:#6b7280;margin:0 0 8px">
@@ -6271,21 +6291,6 @@ function renderParentSettings() {
       </div>
     </div>
 
-    <div class="card" style="border:2px solid #6366F1">
-      <div class="card-title" style="color:#6366F1">🔧 Testing &amp; Debug</div>
-      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:14px">Manually adjust any kid's points for testing.</p>
-      ${kids.map(k => `
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-          <span style="font-size:1.4rem">${k.avatar||'🙂'}</span>
-          <div style="flex:1;font-weight:700;font-size:0.9rem">${esc(k.name)}</div>
-          <input type="number" id="dbg-pts-${k.id}" value="${k.points||0}" min="0"
-                 style="width:80px;text-align:center;font-size:1rem;font-weight:700;
-                        border:1.5px solid var(--border);border-radius:8px;padding:6px 4px">
-          <button class="btn btn-secondary btn-sm"
-                  onclick="debugSetPoints('${k.id}')">Set</button>
-        </div>`).join('')}
-    </div>
-
     <div class="card" style="border:2px solid #1f2937">
       <div class="card-title" style="color:#1f2937">🔧 Advanced</div>
       <p style="font-size:0.82rem;color:var(--muted);margin-bottom:14px">
@@ -6308,20 +6313,6 @@ function saveSetting(key, value) {
   saveData();
 }
 
-function debugSetPoints(memberId) {
-  const member = getMember(memberId);
-  if (!member) return;
-  const input = document.getElementById(`dbg-pts-${memberId}`);
-  const newPts = parseInt(input?.value, 10);
-  if (isNaN(newPts) || newPts < 0) { toast('Enter a valid number'); return; }
-  const diff = newPts - (member.points || 0);
-  member.points = newPts;
-  if (diff !== 0) addHistory('penalty', memberId, `🔧 Manual adjustment`, diff);
-  saveData();
-  renderParentHeader();
-  renderParentNav();
-  toast(`✅ ${member.name}'s points set to ${newPts}`);
-}
 
 function showAddPointsModal(memberId) {
   const m = getMember(memberId);
