@@ -1747,14 +1747,25 @@ function getPendingEntryKeys(data, memberId) {
 function checkForApprovalCelebration(prevPendingKeys, member) {
   let totalNewPoints = 0;
   const approvedChores = [];
+  let anyBeforeApproved = false;
   D.chores.forEach(chore => {
     normalizeCompletionEntries(chore.completions?.[member.id]).forEach(e => {
-      if (prevPendingKeys.has(`${chore.id}:${e.id}`) && e.status === 'done') {
+      if (!prevPendingKeys.has(`${chore.id}:${e.id}`)) return;
+      if (e.entryType === 'before' && e.status === 'approved') {
+        anyBeforeApproved = true; // will show a softer toast, not confetti
+      }
+      if (e.entryType !== 'before' && e.status === 'done') {
         totalNewPoints += chore.points;
         if (!approvedChores.find(c => c.id === chore.id)) approvedChores.push(chore);
       }
     });
   });
+  // Soft notification when a before-photo gets the green light (no points yet)
+  if (anyBeforeApproved && totalNewPoints === 0) {
+    toast("🟢 Parent approved — time to do the chore!");
+    renderKidChores();
+    return;
+  }
   if (totalNewPoints <= 0) return;
   // Update S.currentUser points from fresh data
   const fresh = getMember(member.id);
@@ -1871,13 +1882,17 @@ function timeToMinutes(value) {
 }
 
 function normalizeCompletionEntry(entry) {
+  const validStatuses = ['pending', 'approved', 'done'];
   return {
-    id: entry?.id || genId(),
-    status: entry?.status === 'pending' ? 'pending' : 'done',
-    date: entry?.date || today(),
+    id:        entry?.id        || genId(),
+    status:    validStatuses.includes(entry?.status) ? entry.status : 'done',
+    date:      entry?.date      || today(),
     createdAt: entry?.createdAt || Date.now(),
-    slotId:   entry?.slotId   || null,
-    photoUrl: entry?.photoUrl || null,
+    slotId:    entry?.slotId    || null,
+    photoUrl:  entry?.photoUrl  || null,
+    entryType: entry?.entryType === 'before' ? 'before'
+             : entry?.entryType === 'after'  ? 'after'
+             : null,
   };
 }
 
@@ -1928,7 +1943,8 @@ function normalizeChore(chore) {
     ...chore,
     frequency: period,
     repeatCount: targetCount,
-    requiresPhoto: chore?.requiresPhoto === true,
+    photoMode: (['after','before_after'].includes(chore?.photoMode) ? chore.photoMode
+             : chore?.requiresPhoto === true ? 'after' : 'none'),
     assignedTo: Array.isArray(chore?.assignedTo) ? chore.assignedTo : [],
     description: chore?.description || '',
     completions,
@@ -2155,7 +2171,46 @@ function choreStatus(chore, memberId) {
   return getChoreProgress(chore, memberId).status;
 }
 
-function doCompleteChore(choreId, memberId, slotId = null, photoUrl = null) {
+// Returns the current before/after photo phase for a chore+member combo.
+// phase values: 'needs_before' | 'before_pending' | 'needs_after' | 'after_pending' | 'complete' | null (no photo mode)
+function getChorePhotoPhase(chore, memberId, dateStr = today()) {
+  const mode = chore?.photoMode;
+  if (!mode || mode === 'none') return null;
+
+  const entries = normalizeCompletionEntries(chore.completions?.[memberId])
+    .filter(e => e.date === dateStr);
+
+  if (mode === 'after') {
+    const afterEntry = entries.find(e => e.entryType === 'after' || e.entryType === null);
+    if (!afterEntry)                        return { phase: 'needs_after',   entryType: 'after', canRequest: false, canComplete: true  };
+    if (afterEntry.status === 'pending')    return { phase: 'after_pending', entryType: 'after', canRequest: false, canComplete: false };
+    if (afterEntry.status === 'done')       return { phase: 'complete',      entryType: 'after', canRequest: false, canComplete: false };
+    return                                         { phase: 'needs_after',   entryType: 'after', canRequest: false, canComplete: true  };
+  }
+
+  // before_after mode
+  const beforeEntry = entries.find(e => e.entryType === 'before');
+  const afterEntry  = entries.find(e => e.entryType === 'after');
+
+  if (!beforeEntry)
+    return { phase: 'needs_before',   entryType: 'before', canRequest: true,  canComplete: false };
+  if (beforeEntry.status === 'pending')
+    return { phase: 'before_pending', entryType: 'before', canRequest: false, canComplete: false,
+             errorMsg: 'Already submitted — waiting for parent to OK the start.' };
+  if (beforeEntry.status === 'approved') {
+    if (!afterEntry)
+      return { phase: 'needs_after',   entryType: 'after',  canRequest: false, canComplete: true  };
+    if (afterEntry.status === 'pending')
+      return { phase: 'after_pending', entryType: 'after',  canRequest: false, canComplete: false };
+    if (afterEntry.status === 'done')
+      return { phase: 'complete',      entryType: 'after',  canRequest: false, canComplete: false };
+    return   { phase: 'needs_after',   entryType: 'after',  canRequest: false, canComplete: true  };
+  }
+  // before was rejected (or unexpected state) — allow re-request
+  return { phase: 'needs_before', entryType: 'before', canRequest: true, canComplete: false };
+}
+
+function doCompleteChore(choreId, memberId, slotId = null, photoUrl = null, entryType = null) {
   const chore  = D.chores.find(c => c.id === choreId);
   const member = getMember(memberId);
   if (!chore || !member) return null;
@@ -2167,6 +2222,11 @@ function doCompleteChore(choreId, memberId, slotId = null, photoUrl = null) {
     if (slotStatus.status === 'done')    return { error: 'Already done for this time!' };
     if (slotStatus.status === 'pending') return { error: 'Already submitted — waiting for approval.' };
     if (slotStatus.status === 'waiting') return { error: slotStatus.slot.start ? `Available ${formatTimeWindow({start:slotStatus.slot.start, end:slotStatus.slot.end})}` : 'Not available yet.' };
+  } else if (chore.photoMode === 'before_after') {
+    // Validate phase transition
+    const phase = getChorePhotoPhase(chore, memberId);
+    if (entryType === 'before' && phase.phase !== 'needs_before') return { error: phase.errorMsg || 'Already requested.' };
+    if (entryType === 'after'  && phase.phase !== 'needs_after')  return { error: phase.errorMsg || 'Not ready to submit completion yet.' };
   } else {
     if (!progress.canSubmit) {
       return { error: progress.remainingCount === 0 ? 'This chore is already fully submitted for now.' : (progress.availabilityText || 'This chore is not available right now.') };
@@ -2176,25 +2236,31 @@ function doCompleteChore(choreId, memberId, slotId = null, photoUrl = null) {
   if (!chore.completions) chore.completions = {};
   chore.completions[memberId] = normalizeCompletionEntries(chore.completions[memberId]);
 
+  // For 'before' entries, always require parent approval (never auto-approve the start phase)
+  const isBefore = entryType === 'before';
+  const autoApprove = !isBefore && D.settings.autoApprove;
+
   const completion = {
-    id: genId(),
-    status: D.settings.autoApprove ? 'done' : 'pending',
-    date: today(),
+    id:        genId(),
+    status:    autoApprove ? 'done' : 'pending',
+    date:      today(),
     createdAt: Date.now(),
-    slotId:   slotId   || null,
-    photoUrl: photoUrl || null,
+    slotId:    slotId    || null,
+    photoUrl:  photoUrl  || null,
+    entryType: entryType || null,
   };
   chore.completions[memberId].push(completion);
 
-  if (D.settings.autoApprove) {
+  // Points only awarded for completion (after/null) entries, not before-photo requests
+  if (autoApprove) {
     member.points      = (member.points      || 0) + chore.points;
     member.totalEarned = (member.totalEarned || 0) + chore.points;
     addHistory('chore', memberId, chore.title, chore.points);
     saveData();
-    return { approved:true, points:chore.points };
+    return { approved: true, points: chore.points };
   } else {
     saveData();
-    return { approved:false };
+    return { approved: false, isBefore };
   }
 }
 
@@ -2205,10 +2271,17 @@ function doApproveChore(choreId, memberId, entryId) {
   chore.completions[memberId] = normalizeCompletionEntries(chore.completions[memberId]);
   const entry = chore.completions[memberId].find(item => item.id === entryId);
   if (!entry) return;
-  entry.status = 'done';
-  member.points      = (member.points      || 0) + chore.points;
-  member.totalEarned = (member.totalEarned || 0) + chore.points;
-  addHistory('chore', memberId, chore.title, chore.points);
+
+  if (entry.entryType === 'before') {
+    // Approving a "before" photo just unlocks the chore — no points yet
+    entry.status = 'approved';
+  } else {
+    // Approving a completion ("after" or legacy null) — award points
+    entry.status = 'done';
+    member.points      = (member.points      || 0) + chore.points;
+    member.totalEarned = (member.totalEarned || 0) + chore.points;
+    addHistory('chore', memberId, chore.title, chore.points);
+  }
   saveData();
 }
 
@@ -3081,14 +3154,18 @@ function normalChoreCard(chore, member, progress) {
       </div>`;
   }
 
-  // Standard mode
+  // Standard mode — check for photo phase first
+  const photoPhase = getChorePhotoPhase(chore, member?.id);
+  if (photoPhase) {
+    return normalChoreCardPhoto(chore, member, progress, photoPhase);
+  }
+
   const status = progress?.status || 'none';
   const submitted = progress?.completedCount || 0;
   const target = progress?.targetCount || (status === 'done' ? progress?.doneCount || 1 : 0);
   let btnHtml = '';
   if (progress?.canSubmit) {
-    const btnLabel = chore.requiresPhoto ? '📷 Photo' : (submitted > 0 ? 'Add one more ✓' : 'Done! ✓');
-    btnHtml = `<button class="chore-btn chore-btn-do" onclick="kidCompleteChore('${chore.id}',event)">${btnLabel}</button>`;
+    btnHtml = `<button class="chore-btn chore-btn-do" onclick="kidCompleteChore('${chore.id}',event)">${submitted > 0 ? 'Add one more ✓' : 'Done! ✓'}</button>`;
   } else if (status==='pending' || status==='partial') {
     btnHtml = `<span class="chore-btn chore-btn-pending">⏳ Pending</span>`;
   } else if (status==='unavailable') {
@@ -3103,6 +3180,45 @@ function normalChoreCard(chore, member, progress) {
         <div class="chore-name">${esc(chore.title)}</div>
         <div class="chore-meta">${fmtPts(chore.points)} · ${esc(choreScheduleSummary(chore))}</div>
         ${target>0?`<div class="chore-meta">${submitted}/${target} submitted${progress?.availabilityText?` · ${esc(progress.availabilityText)}`:''}</div>`:progress?.availabilityText?`<div class="chore-meta">${esc(progress.availabilityText)}</div>`:''}
+      </div>
+      <div class="chore-action">${btnHtml}</div>
+    </div>`;
+}
+
+function normalChoreCardPhoto(chore, member, progress, photoPhase) {
+  const { phase } = photoPhase;
+  let statusClass = 'none';
+  let hintHtml = '';
+  let btnHtml  = '';
+
+  if (phase === 'needs_before') {
+    statusClass = 'none';
+    hintHtml = `<div class="chore-meta" style="color:var(--purple)">📷 Take a "before" photo to request this chore</div>`;
+    btnHtml  = `<button class="chore-btn chore-btn-do" onclick="kidCompleteChore('${chore.id}',event,null,'before')">📷 Request</button>`;
+  } else if (phase === 'before_pending') {
+    statusClass = 'pending';
+    hintHtml = `<div class="chore-meta" style="color:var(--yellow)">⏳ Waiting for parent to approve the start</div>`;
+    btnHtml  = `<span class="chore-btn chore-btn-pending">⏳ Awaiting OK</span>`;
+  } else if (phase === 'needs_after') {
+    statusClass = 'partial';
+    hintHtml = `<div class="chore-meta" style="color:var(--green)">🟢 Approved! Do the chore, then submit your done photo.</div>`;
+    btnHtml  = `<button class="chore-btn chore-btn-do" onclick="kidCompleteChore('${chore.id}',event,null,'after')">📷 Done</button>`;
+  } else if (phase === 'after_pending') {
+    statusClass = 'pending';
+    hintHtml = `<div class="chore-meta" style="color:var(--yellow)">⏳ Waiting for parent to approve completion</div>`;
+    btnHtml  = `<span class="chore-btn chore-btn-pending">⏳ Pending</span>`;
+  } else {
+    statusClass = 'done';
+    btnHtml = `<span class="chore-btn chore-btn-done">✅ Done</span>`;
+  }
+
+  return `
+    <div class="chore-item ${statusClass}">
+      <span class="chore-icon">${chore.icon}</span>
+      <div class="chore-info">
+        <div class="chore-name">${esc(chore.title)}</div>
+        <div class="chore-meta">${fmtPts(chore.points)} · ${esc(choreScheduleSummary(chore))}</div>
+        ${hintHtml}
       </div>
       <div class="chore-action">${btnHtml}</div>
     </div>`;
@@ -3135,10 +3251,28 @@ function tinyChoreCard(chore, member, progress) {
       </div>`;
   }
 
+  const photoPhase = getChorePhotoPhase(chore, member?.id);
   let btnHtml = '';
-  if (progress?.canSubmit) {
-    const lbl = chore.requiresPhoto ? '📷 Take Photo' : (progress.completedCount > 0 ? 'Again!' : 'Done!');
-    btnHtml = `<button class="chore-btn chore-btn-do" onclick="kidCompleteChore('${chore.id}',event)" style="font-size:1.2rem;padding:14px 20px">✓ ${lbl}</button>`;
+  let extraMeta = '';
+
+  if (photoPhase) {
+    const { phase } = photoPhase;
+    if (phase === 'needs_before') {
+      extraMeta = `<div class="chore-meta">📷 Take a before photo first!</div>`;
+      btnHtml   = `<button class="chore-btn chore-btn-do" onclick="kidCompleteChore('${chore.id}',event,null,'before')" style="font-size:1.1rem;padding:12px 18px">📷 Request!</button>`;
+    } else if (phase === 'before_pending') {
+      extraMeta = `<div class="chore-meta">⏳ Waiting for OK to start...</div>`;
+      btnHtml   = `<span class="chore-btn chore-btn-pending" style="font-size:1rem">⏳ Waiting...</span>`;
+    } else if (phase === 'needs_after') {
+      extraMeta = `<div class="chore-meta">🟢 Go do it! Then take a done photo!</div>`;
+      btnHtml   = `<button class="chore-btn chore-btn-do" onclick="kidCompleteChore('${chore.id}',event,null,'after')" style="font-size:1.1rem;padding:12px 18px">📷 Done!</button>`;
+    } else if (phase === 'after_pending') {
+      btnHtml   = `<span class="chore-btn chore-btn-pending" style="font-size:1rem">⏳ Waiting...</span>`;
+    } else {
+      btnHtml   = `<span class="chore-btn chore-btn-done" style="font-size:1rem">⭐ Done!</span>`;
+    }
+  } else if (progress?.canSubmit) {
+    btnHtml = `<button class="chore-btn chore-btn-do" onclick="kidCompleteChore('${chore.id}',event)" style="font-size:1.2rem;padding:14px 20px">✓ ${progress.completedCount > 0 ? 'Again!' : 'Done!'}</button>`;
   } else if (status==='pending' || status==='partial') {
     btnHtml = `<span class="chore-btn chore-btn-pending" style="font-size:1rem">⏳ Waiting...</span>`;
   } else if (status==='unavailable') {
@@ -3151,22 +3285,26 @@ function tinyChoreCard(chore, member, progress) {
       <span class="chore-icon" style="font-size:4rem">${chore.icon}</span>
       <div class="chore-name" style="font-size:1.2rem">${esc(chore.title)}</div>
       <div class="chore-meta">⭐ ${chore.points} stars</div>
-      ${progress?.targetCount?`<div class="chore-meta">${progress.completedCount}/${progress.targetCount} done</div>`:''}
-      ${progress?.availabilityText?`<div class="chore-meta">${esc(progress.availabilityText)}</div>`:''}
+      ${extraMeta}
+      ${!photoPhase && progress?.targetCount?`<div class="chore-meta">${progress.completedCount}/${progress.targetCount} done</div>`:''}
+      ${!photoPhase && progress?.availabilityText?`<div class="chore-meta">${esc(progress.availabilityText)}</div>`:''}
       ${btnHtml}
     </div>`;
 }
 
-function kidCompleteChore(choreId, evt, slotId = null) {
+// entryTypeOverride: 'before' | 'after' | null
+// slotId: slot id for slot-mode chores
+function kidCompleteChore(choreId, evt, slotId = null, entryTypeOverride = null) {
   evt && evt.stopPropagation();
   const m = S.currentUser;
   if (!m) return;
   const chore = D.chores.find(c=>c.id===choreId);
   if (!chore) return;
 
-  // Photo required — open capture modal first
-  if (chore.requiresPhoto) {
-    showPhotoCapture(choreId, slotId);
+  // If photo mode is set (after or before_after), always go through photo capture
+  if (chore.photoMode && chore.photoMode !== 'none') {
+    const entryType = entryTypeOverride || (chore.photoMode === 'after' ? 'after' : 'before');
+    showPhotoCapture(choreId, slotId, entryType);
     return;
   }
 
@@ -3209,13 +3347,18 @@ function choreCompleteReact(chore, m, result, evt) {
 }
 
 // ── PHOTO CAPTURE ─────────────────────────────────────────────
-function showPhotoCapture(choreId, slotId) {
+function showPhotoCapture(choreId, slotId, entryType) {
   const chore = D.chores.find(c => c.id === choreId);
+  const isBefore = entryType === 'before';
+  const titleText  = isBefore ? '📷 Take a "Before" Photo'   : '📷 Take a "Done" Photo';
+  const hintText   = isBefore
+    ? `Show the current state of "${esc(chore?.title||'')}" — e.g. the messy room, the full trash can. Parent will approve before you start.`
+    : `Show that you've completed "${esc(chore?.title||'')}"`;
+  const submitText = isBefore ? 'Submit — Request to Start ✓' : 'Submit Completion ✓';
+
   showModal(`
-    <div class="modal-title">📷 Take a Photo</div>
-    <p style="color:var(--muted);font-size:0.9rem;margin-bottom:14px">
-      Show you completed: <strong>${esc(chore?.title||'')}</strong>
-    </p>
+    <div class="modal-title">${titleText}</div>
+    <p style="color:var(--muted);font-size:0.88rem;margin-bottom:14px">${hintText}</p>
     <div class="photo-preview-wrap" id="photo-drop-zone" onclick="document.getElementById('photo-file-input').click()">
       <img id="photo-preview-img" src="" alt="" style="display:none">
       <div id="photo-drop-hint" style="color:var(--muted);font-size:2rem;padding:20px 0">
@@ -3224,7 +3367,7 @@ function showPhotoCapture(choreId, slotId) {
     </div>
     <input type="file" id="photo-file-input" accept="image/*" capture="environment" style="display:none" onchange="previewChorePhoto(event)">
     <div class="modal-actions" style="flex-direction:column;gap:10px">
-      <button class="btn btn-primary" id="photo-submit-btn" style="opacity:0.4;pointer-events:none" onclick="submitChorePhoto('${choreId}','${slotId||''}')">Submit Photo ✓</button>
+      <button class="btn btn-primary" id="photo-submit-btn" style="opacity:0.4;pointer-events:none" onclick="submitChorePhoto('${choreId}','${slotId||''}','${entryType||''}')">${submitText}</button>
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
     </div>`);
 }
@@ -3245,7 +3388,7 @@ function previewChorePhoto(event) {
   reader.readAsDataURL(file);
 }
 
-async function submitChorePhoto(choreId, slotId) {
+async function submitChorePhoto(choreId, slotId, entryType) {
   const input = document.getElementById('photo-file-input');
   const file  = input?.files[0];
   if (!file) { toast('Please take a photo first'); return; }
@@ -3255,15 +3398,22 @@ async function submitChorePhoto(choreId, slotId) {
     const photoUrl = await uploadChorePhoto(file);
     closeModal();
     const m = S.currentUser;
-    const result = doCompleteChore(choreId, m.id, slotId || null, photoUrl);
+    const resolvedEntryType = entryType || null;
+    const result = doCompleteChore(choreId, m.id, slotId || null, photoUrl, resolvedEntryType);
     if (!result) return;
     if (result.error) { toast(result.error); return; }
+    if (result.isBefore) {
+      toast('📷 Before photo sent! Waiting for parent to approve the start ⏳');
+      if (isTiny(m)) speak('Photo sent! Waiting for Mom or Dad to say yes!');
+      renderKidChores(); renderKidHeader(); renderKidNav();
+      return;
+    }
     const chore = D.chores.find(c => c.id === choreId);
     choreCompleteReact(chore, m, result, null);
   } catch(e) {
     console.warn('Photo upload failed:', e);
     toast('Upload failed — check your connection and try again.');
-    if (btn) { btn.style.opacity = '1'; btn.style.pointerEvents = 'auto'; btn.textContent = 'Submit Photo ✓'; }
+    if (btn) { btn.style.opacity = '1'; btn.style.pointerEvents = 'auto'; btn.textContent = 'Submit Completion ✓'; }
   }
 }
 
@@ -3708,6 +3858,13 @@ function renderParentHome() {
       if (!mem) return;
       const slotLabel = entry.slotId && chore.schedule?.slots
         ? (chore.schedule.slots.find(s=>s.id===entry.slotId)?.label || '') : '';
+      const isBefore = entry.entryType === 'before';
+      const entryBadge = isBefore
+        ? `<span style="background:#EDE9FE;color:var(--purple);border-radius:6px;padding:2px 8px;font-size:0.75rem;font-weight:700;margin-left:6px">BEFORE</span>`
+        : entry.entryType === 'after'
+        ? `<span style="background:#DCFCE7;color:#166534;border-radius:6px;padding:2px 8px;font-size:0.75rem;font-weight:700;margin-left:6px">DONE</span>`
+        : '';
+      const ptsLabel = isBefore ? 'Approve to let them start (no pts yet)' : `+${chore.points} pts`;
       const photoHtml = entry.photoUrl
         ? `<img src="${entry.photoUrl}" class="photo-approval-thumb" onclick="viewPhoto('${entry.photoUrl}')" alt="Photo" title="Click to view full size">`
         : '';
@@ -3715,8 +3872,8 @@ function renderParentHome() {
         <div class="admin-card" style="flex-wrap:wrap;gap:10px">
           <span class="admin-icon">${chore.icon}</span>
           <div class="admin-info" style="flex:1;min-width:0">
-            <div class="admin-name">${esc(chore.title)}${slotLabel?` <span style="font-size:0.8rem;color:var(--muted)">(${esc(slotLabel)})</span>`:''}</div>
-            <div class="admin-meta">${mem.avatar} ${esc(mem.name)} · +${chore.points} pts · ${fmtDate(entry.date)}</div>
+            <div class="admin-name">${esc(chore.title)}${entryBadge}${slotLabel?` <span style="font-size:0.8rem;color:var(--muted)">(${esc(slotLabel)})</span>`:''}</div>
+            <div class="admin-meta">${mem.avatar} ${esc(mem.name)} · ${ptsLabel} · ${fmtDate(entry.date)}</div>
             ${photoHtml}
           </div>
           <div class="admin-actions" style="align-self:flex-start">
@@ -3972,13 +4129,15 @@ function showChoreModal(choreId) {
     </div>
     ${kids.length>0?`<div class="form-group"><label class="form-label">Assign to</label>${assignOpts}</div>`:''}
     <div class="form-group">
-      <label class="chore-checkbox-row" style="gap:12px">
-        <input type="checkbox" id="cm-photo" ${c.requiresPhoto?'checked':''}>
-        <div>
-          <div style="font-weight:700">📷 Require photo</div>
-          <div style="font-size:0.8rem;color:var(--muted)">Kid must snap a photo before submitting</div>
-        </div>
-      </label>
+      <label class="form-label">📷 Photo requirement</label>
+      <select id="cm-photo">
+        <option value="none"         ${c.photoMode==='none'        ||!c.photoMode?'selected':''}>No photo needed</option>
+        <option value="after"        ${c.photoMode==='after'       ?'selected':''}>Completion photo (after only)</option>
+        <option value="before_after" ${c.photoMode==='before_after'?'selected':''}>Before + after photos (verify it needs doing)</option>
+      </select>
+      <div class="schedule-help" style="margin-top:6px">
+        "Before + after" makes the kid photograph the dirty room/full trash <em>before</em> you approve the start, then photograph the finished result for points.
+      </div>
     </div>
     <div class="form-group">
       <label class="form-label">Description <span class="form-label-hint">optional</span></label>
@@ -3993,19 +4152,53 @@ function showChoreModal(choreId) {
   renderSlotEditor();
 }
 
+// Lazy-loaded emojilib dataset (full ~1800 Unicode emoji with keywords)
+let _emojiLib = null;
+let _emojiLibLoading = false;
+
+async function loadEmojiLib() {
+  if (_emojiLib) return _emojiLib;
+  if (_emojiLibLoading) return null;
+  _emojiLibLoading = true;
+  try {
+    const res = await fetch('https://cdn.jsdelivr.net/npm/emojilib@3.0.0/dist/emoji-en-US.json');
+    const raw = await res.json();
+    // Convert { "😀": ["grinning", "face"] } → [{ e: "😀", k: "grinning face" }]
+    _emojiLib = Object.entries(raw).map(([e, keywords]) => ({ e, k: keywords.join(' ') }));
+    _emojiLibLoading = false;
+    return _emojiLib;
+  } catch(err) {
+    _emojiLibLoading = false;
+    console.warn('Could not load emojilib — falling back to local map', err);
+    _emojiLib = EMOJI_MAP; // fallback to our curated set
+    return _emojiLib;
+  }
+}
+
 function filterIcons(query) {
   const q = query.toLowerCase().trim();
-  const matches = q ? EMOJI_MAP.filter(({k}) => k.includes(q)) : EMOJI_MAP.slice(0, 48);
   const cur = document.getElementById('cm-icon')?.value;
   const grid = document.getElementById('icon-picker-grid');
   if (!grid) return;
+
+  // Use whatever dataset is already loaded; trigger a load if not yet started
+  const dataset = _emojiLib || EMOJI_MAP;
+  const matches = q ? dataset.filter(({k}) => k.includes(q)) : dataset.slice(0, 60);
+
   if (matches.length === 0) {
     grid.innerHTML = `<div style="color:var(--muted);font-size:0.85rem;padding:8px;grid-column:1/-1">No icons found — try different words.</div>`;
-    return;
+  } else {
+    grid.innerHTML = matches.slice(0, 80).map(({e:ic}) =>
+      `<div class="icon-opt${ic===cur?' sel':''}" onclick="selChoreIcon(this,'${ic}')">${ic}</div>`
+    ).join('');
   }
-  grid.innerHTML = matches.slice(0, 60).map(({e:ic}) =>
-    `<div class="icon-opt${ic===cur?' sel':''}" onclick="selChoreIcon(this,'${ic}')">${ic}</div>`
-  ).join('');
+
+  // If emojilib isn't loaded yet, kick off the load and refresh when done
+  if (!_emojiLib) {
+    loadEmojiLib().then(lib => {
+      if (lib && document.getElementById('icon-picker-grid')) filterIcons(query);
+    });
+  }
 }
 
 function selChoreIcon(el, icon) {
@@ -4074,7 +4267,7 @@ function saveChore(choreId) {
   const icon   = document.getElementById('cm-icon')?.value || '📋';
   const points = parseInt(document.getElementById('cm-points')?.value)||10;
   const freq   = document.getElementById('cm-freq')?.value || 'day';
-  const requiresPhoto = document.getElementById('cm-photo')?.checked === true;
+  const photoMode = document.getElementById('cm-photo')?.value || 'none';
   const desc   = document.getElementById('cm-desc')?.value.trim();
   const assigned = [...document.querySelectorAll('input[name=assign]:checked')].map(x=>x.value);
 
@@ -4104,7 +4297,7 @@ function saveChore(choreId) {
     scheduleObj = { period: freq, targetCount: repeatCount, daysOfWeek, windows, slots:null };
   }
 
-  const choreData = { title, icon, points, requiresPhoto, frequency: freq,
+  const choreData = { title, icon, points, photoMode, frequency: freq,
     repeatCount: scheduleObj.targetCount, assignedTo: assigned, description: desc, schedule: scheduleObj };
 
   if (choreId) {
