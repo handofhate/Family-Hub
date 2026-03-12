@@ -3914,15 +3914,20 @@ function renderParentHome() {
       ? `<div class="empty-state" style="padding:16px 8px"><div class="empty-text">No chores assigned</div></div>`
       : `<div class="kid-overview-list">${myChores.map(chore => {
           const status = choreStatus(chore, kid.id);
-          const statusClass = status === 'done' ? 'done' : ['pending','partial'].includes(status) ? 'pending' : 'todo';
-          const statusLabel = status === 'done' ? 'Done' : ['pending','partial'].includes(status) ? 'In progress' : status === 'unavailable' ? 'Later' : 'To do';
+          const isDone = status === 'done';
+          const statusClass = isDone ? 'done' : ['pending','partial'].includes(status) ? 'pending' : 'todo';
+          const statusLabel = isDone ? 'Done' : ['pending','partial'].includes(status) ? 'In progress' : status === 'unavailable' ? 'Later' : 'To do';
+          const markDoneBtn = !isDone
+            ? `<button class="btn-icon-sm btn-icon-approve" style="margin-left:6px;flex-shrink:0" title="Mark done (award points)" onclick="parentMarkChoreDone('${chore.id}','${kid.id}')">✓</button>`
+            : '';
           return `
             <div class="kid-overview-item">
-              <div>
+              <div style="flex:1;min-width:0">
                 <div style="font-weight:700">${chore.icon} ${esc(chore.title)}</div>
                 <div style="font-size:0.82rem;color:var(--muted)">${fmtPts(chore.points)} · ${esc(choreScheduleSummary(chore))}</div>
               </div>
               <span class="kid-overview-status ${statusClass}">${statusLabel}</span>
+              ${markDoneBtn}
             </div>`;
         }).join('')}</div>`;
     kidsHtml += `
@@ -3980,6 +3985,35 @@ function rejectChore(choreId, memberId, entryId) {
   doRejectChore(choreId, memberId, entryId);
   const m = getMember(memberId);
   toast(`Rejected chore for ${m?.name}`);
+  renderParentHome();
+  renderParentHeader();
+  renderParentNav();
+}
+
+// Parent directly marks a chore done for a kid (no kid submission required)
+function parentMarkChoreDone(choreId, memberId) {
+  const chore  = D.chores.find(c => c.id === choreId);
+  const member = getMember(memberId);
+  if (!chore || !member) return;
+
+  // Check if already done to avoid double-crediting
+  const progress = getChoreProgress(chore, memberId);
+  if (progress.status === 'done') {
+    toast(`${chore.icon} Already marked done for ${member.name}`);
+    return;
+  }
+
+  if (!chore.completions) chore.completions = {};
+  chore.completions[memberId] = normalizeCompletionEntries(chore.completions[memberId]);
+  chore.completions[memberId].push({
+    id: genId(), status: 'done', date: today(), createdAt: Date.now(),
+    slotId: null, photoUrl: null, entryType: null,
+  });
+  member.points      = (member.points      || 0) + chore.points;
+  member.totalEarned = (member.totalEarned || 0) + chore.points;
+  addHistory('chore', memberId, chore.title, chore.points);
+  saveData();
+  toast(`✅ Marked "${chore.title}" done for ${member.name} (+${chore.points} pts)`);
   renderParentHome();
   renderParentHeader();
   renderParentNav();
