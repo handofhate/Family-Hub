@@ -1843,6 +1843,7 @@ let S = {            // UI state (not persisted)
   pinBuffer:     '',
   pinMode:       'app', // 'app' = gate to member picker | 'parent' = gate to parent view
   syncStatus:    'idle', // 'idle' | 'syncing' | 'ok' | 'error'
+  lastLocalSave: 0,     // timestamp of last local write — suppresses stale Firestore snapshots
 };
 
 // ── DEFAULT DATA ──────────────────────────────────────────────
@@ -1889,6 +1890,7 @@ function loadData() {
 }
 
 function saveData() {
+  S.lastLocalSave = Date.now();
   try { localStorage.setItem(LS_KEY, JSON.stringify(D)); } catch(e) {}
   pushToFirestore();
 }
@@ -1965,7 +1967,10 @@ function subscribeToFirestore(onFirstLoad) {
     if (snap.exists) {
       const incoming = snap.data();
       const normalizedIncoming = normalizeData(incoming);
-      if (JSON.stringify(normalizedIncoming) !== JSON.stringify(D)) {
+      // Ignore snapshots arriving within 1500ms of a local save — they may be echoes
+      // of a previous write that arrived after we've already moved on locally.
+      const isStaleEcho = !firstSnapshot && (Date.now() - S.lastLocalSave) < 1500;
+      if (!isStaleEcho && JSON.stringify(normalizedIncoming) !== JSON.stringify(D)) {
         // Capture what was pending before the update (for approval celebration)
         const prevPending = S.currentUser ? getPendingEntryKeys(D, S.currentUser.id) : new Set();
         D = normalizedIncoming;
