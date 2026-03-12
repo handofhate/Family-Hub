@@ -4295,14 +4295,22 @@ function renderKidShop() {
     const canAfford = balance >= p.cost;
     const cls = canAfford ? 'can-afford' : (isFamily ? 'family-type':'');
     const tts  = `${p.title}. Costs ${p.cost} points.${canAfford?' You can get this!':` You need ${p.cost-balance} more points.`}`;
+    const barPct = isFamily ? Math.min(100, Math.round(balance / (p.cost||1) * 100)) : 0;
     return `
       <div class="prize-card ${cls}" onclick="kidRedeemPrize('${p.id}',${isFamily},event)${tiny?`;speak('${tts.replace(/'/g,"\\'")}')`:''}"
            ${tiny?`title="${esc(tts)}"`:''}>
         <span class="prize-icon">${p.icon}</span>
         <div class="prize-name">${esc(p.title)}</div>
         <div class="prize-cost">⭐ ${p.cost}</div>
+        ${isFamily&&!tiny?`
+          <div style="margin-top:6px">
+            <div style="background:rgba(0,0,0,0.08);border-radius:999px;height:5px;overflow:hidden">
+              <div style="height:100%;border-radius:999px;background:var(--teal);width:${barPct}%;transition:width 0.4s"></div>
+            </div>
+            <div style="font-size:0.68rem;color:var(--muted);margin-top:2px;text-align:center">${balance} / ${p.cost} pts</div>
+          </div>`:''}
         ${!tiny&&isFamily?`<div class="prize-type-badge family">👨‍👩‍👧‍👦 Family</div>`:''}
-        ${!canAfford&&!tiny?`<div style="font-size:0.72rem;color:var(--muted);margin-top:3px">${p.cost-pts} more pts needed</div>`:''}
+        ${!canAfford&&!tiny&&!isFamily?`<div style="font-size:0.72rem;color:var(--muted);margin-top:3px">${p.cost-balance} more pts needed</div>`:''}
       </div>`;
   };
 
@@ -6077,6 +6085,19 @@ function advSetPrize(id, field, val) {
   _advRefreshStatus(`Prize saved`);
 }
 
+function advClearChoreCompletions(choreId, memberId) {
+  const chore = D.chores.find(c => c.id === choreId);
+  if (!chore) return;
+  if (memberId) {
+    if (chore.completions) delete chore.completions[memberId];
+  } else {
+    chore.completions = {};
+  }
+  saveData();
+  _advRenderPreserving();
+  _advRefreshStatus('Completions cleared');
+}
+
 function advDeleteHistory(entryId) {
   const idx = D.history.findIndex(h => h.id === entryId);
   if (idx < 0) return;
@@ -6163,18 +6184,37 @@ function _advRender() {
   // ── Chores section ──
   const choresHtml = D.chores.length === 0
     ? '<div style="color:#9ca3af;font-size:0.85rem">No chores yet</div>'
-    : D.chores.map(c => `
-      <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f3f4f6">
-        <span style="font-size:1.2rem;width:28px;text-align:center">${c.icon||'📋'}</span>
-        <span style="flex:1;font-size:0.85rem;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(c.title)}">${esc(c.title)}</span>
-        <label style="font-size:0.75rem;color:#6b7280;white-space:nowrap">pts</label>
-        <input type="number" class="adv-field-input" style="width:70px" value="${c.points||0}"
-          onchange="advSetChore('${c.id}','points',+this.value)">
-        <input type="text" class="adv-field-input" style="width:70px" value="${esc(c.icon||'')}" placeholder="icon"
-          onchange="advSetChore('${c.id}','icon',this.value)">
-        <input type="text" class="adv-field-input" style="flex:1;min-width:80px" value="${esc(c.title||'')}" placeholder="title"
-          onchange="advSetChore('${c.id}','title',this.value)">
-      </div>`).join('');
+    : D.chores.map(c => {
+      const completionRows = D.family.members.filter(m => {
+        const entries = normalizeCompletionEntries(c.completions?.[m.id]);
+        return entries.length > 0;
+      }).map(m => {
+        const entries = normalizeCompletionEntries(c.completions[m.id]);
+        const doneCount = entries.filter(e=>e.status==='done').length;
+        const pendCount = entries.filter(e=>e.status==='pending').length;
+        const summary = [doneCount&&`${doneCount} done`, pendCount&&`${pendCount} pending`].filter(Boolean).join(', ');
+        return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0">
+          <span style="font-size:1rem">${m.avatar||'🙂'}</span>
+          <span style="font-size:0.8rem;flex:1">${esc(m.name)}: ${summary} (${entries.length} total)</span>
+          <button onclick="advClearChoreCompletions('${c.id}','${m.id}')" style="background:#FEE2E2;color:#991b1b;border:none;border-radius:5px;padding:2px 7px;font-size:0.72rem;cursor:pointer">Clear</button>
+        </div>`;
+      }).join('');
+      return `
+        <div style="padding:6px 0;border-bottom:1px solid #f3f4f6">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:1.2rem;width:28px;text-align:center">${c.icon||'📋'}</span>
+            <span style="flex:1;font-size:0.85rem;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(c.title)}">${esc(c.title)}</span>
+            <label style="font-size:0.75rem;color:#6b7280;white-space:nowrap">pts</label>
+            <input type="number" class="adv-field-input" style="width:70px" value="${c.points||0}"
+              onchange="advSetChore('${c.id}','points',+this.value)">
+            <input type="text" class="adv-field-input" style="width:70px" value="${esc(c.icon||'')}" placeholder="icon"
+              onchange="advSetChore('${c.id}','icon',this.value)">
+            <input type="text" class="adv-field-input" style="flex:1;min-width:80px" value="${esc(c.title||'')}" placeholder="title"
+              onchange="advSetChore('${c.id}','title',this.value)">
+          </div>
+          ${completionRows ? `<details style="margin-top:4px"><summary style="font-size:0.72rem;color:#6b7280;cursor:pointer;padding:2px 0">Completions ▸</summary><div style="padding:4px 0 0 8px">${completionRows}</div></details>` : ''}
+        </div>`;
+    }).join('');
 
   // ── Prizes section ──
   const prizesHtml = D.prizes.length === 0
