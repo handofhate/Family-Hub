@@ -2179,6 +2179,10 @@ function normalizeData(data) {
     }
   }
   normalized.teamGoals = Array.isArray(normalized.teamGoals) ? normalized.teamGoals : [];
+  // Migrate old combo bonus history entries that were incorrectly saved as type 'chore'
+  normalized.history = (normalized.history || []).map(h =>
+    h.type === 'chore' && h.title?.includes('Combo Bonus') ? { ...h, type: 'bonus' } : h
+  );
   normalized.v = 3;
   return normalized;
 }
@@ -2621,6 +2625,7 @@ function checkLevelUp(member, prevLevel) {
   if (current.level > prevLevel) {
     awardBadgeIfNew(member, 'level_up');
     if (current.level === 7) awardBadgeIfNew(member, 'level_master');
+    addHistory('level', member.id, `${current.icon} Level Up — ${current.name}!`, 0);
     toast(`${current.icon} Level up! ${member.name} is now ${current.name}!`);
   }
 }
@@ -4598,7 +4603,7 @@ function buildMemberStats(member) {
     savings:          member.savings || 0,
     comboCount:       bonusHist.length,
     comboStars:       bonusHist.reduce((s,h) => s + Math.abs(h.points||0), 0),
-    levelUps:         levelHist.length,
+    levelUps:         Math.max(levelHist.length, lvlInfo.current.level - 1),
     currentLevel:     lvlInfo.current,
     daysActive,
     bestDate:         bestDate ? { date: bestDate[0], pts: bestDate[1] } : null,
