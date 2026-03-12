@@ -1870,7 +1870,7 @@ function defaultData() {
     family: { name:'Our Family', members:[] },
     chores:     [],
     prizes:     [],
-    familyGoal: null,
+    teamGoals:  [],
     activities: [],
     history:    [],
   };
@@ -2161,6 +2161,24 @@ function normalizeData(data) {
   normalized.prizes = Array.isArray(normalized.prizes) ? normalized.prizes : [];
   normalized.activities = Array.isArray(normalized.activities) ? normalized.activities : [];
   normalized.history = Array.isArray(normalized.history) ? normalized.history : [];
+  // Migrate old familyGoal → teamGoals[0]
+  if (!normalized.teamGoals) {
+    normalized.teamGoals = normalized.familyGoal
+      ? [{ id: genId(), ...normalized.familyGoal }]
+      : [];
+    delete normalized.familyGoal;
+  }
+  // Migrate family-type prizes → team goals
+  const familyPrizes = normalized.prizes.filter(p => p.type === 'family');
+  if (familyPrizes.length > 0) {
+    normalized.prizes = normalized.prizes.filter(p => p.type !== 'family');
+    for (const p of familyPrizes) {
+      if (!normalized.teamGoals.find(g => g.id === p.id || g.title === p.title)) {
+        normalized.teamGoals.push({ id: p.id, title: p.title, icon: p.icon, targetPoints: p.cost, contributions: {} });
+      }
+    }
+  }
+  normalized.teamGoals = Array.isArray(normalized.teamGoals) ? normalized.teamGoals : [];
   normalized.v = 3;
   return normalized;
 }
@@ -2507,40 +2525,32 @@ function doRedeemPrize(prizeId, memberId) {
   const prize  = D.prizes.find(p => p.id === prizeId);
   const member = getMember(memberId);
   if (!prize || !member) return false;
-
-  if (prize.type === 'family') {
-    const total = Object.values(D.familyGoal?.contributions || {}).reduce((a,b)=>a+b,0);
-    if (total < prize.cost) return false;
-    D.familyGoal.contributions = {};
-    addHistory('prize', memberId, prize.title, -prize.cost);
-  } else {
-    if ((member.points||0) < prize.cost) return false;
-    member.points -= prize.cost;
-    addHistory('prize', memberId, prize.title, -prize.cost);
-  }
-
+  if ((member.points||0) < prize.cost) return false;
+  member.points -= prize.cost;
+  addHistory('prize', memberId, prize.title, -prize.cost);
   if (!prize.redemptions) prize.redemptions = [];
   prize.redemptions.push({ memberId, date:today() });
   saveData();
   return true;
 }
 
-// ── FAMILY GOAL ───────────────────────────────────────────────
-function doContributeToGoal(memberId, points) {
-  const member = getMember(memberId);
-  if (!member || !D.familyGoal) return false;
-  if ((member.points||0) < points || points <= 0) return false;
-  member.points -= points;
-  D.familyGoal.contributions = D.familyGoal.contributions || {};
-  D.familyGoal.contributions[memberId] = (D.familyGoal.contributions[memberId]||0) + points;
-  addHistory('goal', memberId, D.familyGoal.title, -points);
-  saveData();
-  return true;
+// ── TEAM GOALS ────────────────────────────────────────────────
+function goalTotal(goal) {
+  if (!goal) return 0;
+  return Object.values(goal.contributions||{}).reduce((a,b)=>a+b,0);
 }
 
-function goalTotal() {
-  if (!D.familyGoal) return 0;
-  return Object.values(D.familyGoal.contributions||{}).reduce((a,b)=>a+b,0);
+function doContributeToGoal(memberId, goalId, points) {
+  const member = getMember(memberId);
+  const goal = D.teamGoals?.find(g => g.id === goalId);
+  if (!member || !goal) return false;
+  if ((member.points||0) < points || points <= 0) return false;
+  member.points -= points;
+  goal.contributions = goal.contributions || {};
+  goal.contributions[memberId] = (goal.contributions[memberId]||0) + points;
+  addHistory('goal', memberId, goal.title, -points);
+  saveData();
+  return true;
 }
 
 // ── HISTORY ───────────────────────────────────────────────────
@@ -3681,7 +3691,7 @@ function renderKidNav() {
     ['chores','📋','Chores'],
     ['points','⭐','Points'],
     ['shop','🛍️','Shop'],
-    ['goal','🎯','Goal'],
+    ['team','🏆','Team'],
     ['stats','📊','Stats'],
   ];
   document.getElementById('kid-nav').innerHTML = tabs.map(([id,icon,label]) => `
@@ -3701,7 +3711,7 @@ function renderKidTab() {
     case 'chores': renderKidChores(); break;
     case 'points': renderKidPoints(); break;
     case 'shop':   renderKidShop();   break;
-    case 'goal':   renderKidGoal();   break;
+    case 'team':   renderKidTeam();   break;
     case 'stats':  renderStatsPage(document.getElementById('kid-content')); break;
   }
 }
@@ -4278,10 +4288,8 @@ function renderKidShop() {
   const tiny = isTiny(m);
   const pts  = m.points || 0;
   const indiv = D.prizes.filter(p => p.type === 'individual');
-  const family= D.prizes.filter(p => p.type === 'family');
-  const goalTotal2 = goalTotal();
 
-  if (D.prizes.length === 0) {
+  if (indiv.length === 0) {
     document.getElementById('kid-content').innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">🎁</div>
@@ -4290,27 +4298,17 @@ function renderKidShop() {
     return;
   }
 
-  const renderPrizeCard = (p, isFamily=false) => {
-    const balance  = isFamily ? goalTotal2 : pts;
-    const canAfford = balance >= p.cost;
-    const cls = canAfford ? 'can-afford' : (isFamily ? 'family-type':'');
-    const tts  = `${p.title}. Costs ${p.cost} points.${canAfford?' You can get this!':` You need ${p.cost-balance} more points.`}`;
-    const barPct = isFamily ? Math.min(100, Math.round(balance / (p.cost||1) * 100)) : 0;
+  const renderPrizeCard = (p) => {
+    const canAfford = pts >= p.cost;
+    const cls = canAfford ? 'can-afford' : '';
+    const tts  = `${p.title}. Costs ${p.cost} points.${canAfford?' You can get this!':` You need ${p.cost-pts} more points.`}`;
     return `
-      <div class="prize-card ${cls}" onclick="kidRedeemPrize('${p.id}',${isFamily},event)${tiny?`;speak('${tts.replace(/'/g,"\\'")}')`:''}"
+      <div class="prize-card ${cls}" onclick="kidRedeemPrize('${p.id}',event)${tiny?`;speak('${tts.replace(/'/g,"\\'")}')`:''}"
            ${tiny?`title="${esc(tts)}"`:''}>
         <span class="prize-icon">${p.icon}</span>
         <div class="prize-name">${esc(p.title)}</div>
         <div class="prize-cost">⭐ ${p.cost}</div>
-        ${isFamily&&!tiny?`
-          <div style="margin-top:6px">
-            <div style="background:rgba(0,0,0,0.08);border-radius:999px;height:5px;overflow:hidden">
-              <div style="height:100%;border-radius:999px;background:var(--teal);width:${barPct}%;transition:width 0.4s"></div>
-            </div>
-            <div style="font-size:0.68rem;color:var(--muted);margin-top:2px;text-align:center">${balance} / ${p.cost} pts</div>
-          </div>`:''}
-        ${!tiny&&isFamily?`<div class="prize-type-badge family">👨‍👩‍👧‍👦 Family</div>`:''}
-        ${!canAfford&&!tiny&&!isFamily?`<div style="font-size:0.72rem;color:var(--muted);margin-top:3px">${p.cost-balance} more pts needed</div>`:''}
+        ${!canAfford&&!tiny?`<div style="font-size:0.72rem;color:var(--muted);margin-top:3px">${p.cost-pts} more pts needed</div>`:''}
       </div>`;
   };
 
@@ -4321,37 +4319,20 @@ function renderKidShop() {
         <div style="font-size:0.8rem;color:var(--muted)">your points</div>
       </div>
       ${tiny?`<div style="font-size:2rem">${m.avatar}</div>`:''}
-    </div>`;
-
-  if (indiv.length > 0) {
-    html += `<div class="section-row"><span class="section-title">🎁 My Prizes</span></div>
-             <div class="prize-grid">${indiv.map(p=>renderPrizeCard(p,false)).join('')}</div>`;
-  }
-
-  if (family.length > 0) {
-    const goalPts = goalTotal2;
-    html += `
-      <div class="section-row mt-12"><span class="section-title">👨‍👩‍👧‍👦 Family Prizes</span></div>
-      <div class="card" style="background:#F0FAFA;border:2px solid var(--teal);margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-weight:700">🏦 Family Goal Bank</span>
-          <span style="font-weight:800;color:var(--teal)">⭐ ${goalPts} pts</span>
-        </div>
-        ${!tiny?`<p style="font-size:0.8rem;color:var(--muted);margin-top:6px">Everyone contributes to unlock family prizes!</p>`:''}
-      </div>
-      <div class="prize-grid">${family.map(p=>renderPrizeCard(p,true)).join('')}</div>`;
-  }
+    </div>
+    <div class="section-row"><span class="section-title">🎁 My Prizes</span></div>
+    <div class="prize-grid">${indiv.map(p=>renderPrizeCard(p)).join('')}</div>`;
 
   document.getElementById('kid-content').innerHTML = html;
 }
 
-function kidRedeemPrize(prizeId, isFamily, evt) {
+function kidRedeemPrize(prizeId, evt) {
   evt && evt.stopPropagation();
   const m     = S.currentUser;
   const prize = D.prizes.find(p=>p.id===prizeId);
   if (!m || !prize) return;
 
-  const pts    = isFamily ? goalTotal() : (m.points||0);
+  const pts = m.points||0;
   if (pts < prize.cost) {
     const need = prize.cost - pts;
     if (isTiny(m)) speak(`You need ${need} more stars for this prize!`);
@@ -4359,20 +4340,16 @@ function kidRedeemPrize(prizeId, isFamily, evt) {
     return;
   }
 
-  const confirm = isFamily
-    ? `Redeem <strong>${esc(prize.icon)} ${esc(prize.title)}</strong> for the whole family? (costs ${prize.cost} family pts)`
-    : `Redeem <strong>${esc(prize.icon)} ${esc(prize.title)}</strong> for ${prize.cost} of your ⭐ ${m.points||0} points?`;
-
   showModal(`
     <div class="modal-title">${prize.icon} Redeem Prize?</div>
-    <p style="margin-bottom:20px;line-height:1.6">${confirm}</p>
+    <p style="margin-bottom:20px;line-height:1.6">Redeem <strong>${esc(prize.icon)} ${esc(prize.title)}</strong> for ${prize.cost} of your ⭐ ${pts} points?</p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Not yet</button>
-      <button class="btn btn-primary" onclick="confirmRedeem('${prizeId}',${isFamily})">Yes, redeem! 🎉</button>
+      <button class="btn btn-primary" onclick="confirmRedeem('${prizeId}')">Yes, redeem! 🎉</button>
     </div>`);
 }
 
-function confirmRedeem(prizeId, isFamily) {
+function confirmRedeem(prizeId) {
   const m     = S.currentUser;
   const prize = D.prizes.find(p=>p.id===prizeId);
   closeModal();
@@ -4388,86 +4365,80 @@ function confirmRedeem(prizeId, isFamily) {
   });
 }
 
-// ── GOAL TAB ──────────────────────────────────────────────────
-function renderKidGoal() {
-  const m   = S.currentUser;
-  const g   = D.familyGoal;
-  const pts = m.points || 0;
+// ── TEAM TAB ──────────────────────────────────────────────────
+function renderKidTeam() {
+  const m    = S.currentUser;
+  const tiny = isTiny(m);
+  const pts  = m.points || 0;
+  const goals = D.teamGoals || [];
+  const kids  = D.family.members.filter(k=>k.role==='kid');
 
-  if (!g) {
+  if (goals.length === 0) {
     document.getElementById('kid-content').innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">🎯</div>
-        <div class="empty-text">No family goal set yet. Ask a parent to add one!</div>
+        <div class="empty-icon">🏆</div>
+        <div class="empty-text">No team prizes yet! Ask a parent to add some.</div>
       </div>`;
     return;
   }
 
-  const total  = goalTotal();
-  const target = g.targetPoints || 1;
-  const pct    = Math.min(100, Math.round(total/target*100));
-  const myContrib = (g.contributions||{})[m.id] || 0;
-
-  // Contribution breakdown
-  const kids = D.family.members.filter(k=>k.role==='kid');
-  const contribs = kids.map(k => {
-    const c = (g.contributions||{})[k.id]||0;
-    const pctBar = total>0 ? Math.round(c/total*100) : 0;
+  const goalCards = goals.map(g => {
+    const total  = goalTotal(g);
+    const target = g.targetPoints || 1;
+    const pct    = Math.min(100, Math.round(total/target*100));
+    const reached = pct >= 100;
+    const myContrib = (g.contributions||{})[m.id] || 0;
+    const contribs = kids.map(k => {
+      const c = (g.contributions||{})[k.id]||0;
+      const pctBar = total>0 ? Math.round(c/total*100) : 0;
+      return `
+        <div class="contrib-row">
+          <span class="contrib-avatar">${k.avatar||'🙂'}</span>
+          <span class="contrib-name" style="color:#fff">${esc(k.name)}</span>
+          <div class="contrib-bar-bg"><div class="contrib-fill" style="width:${pctBar}%"></div></div>
+          <span class="contrib-val">${c}</span>
+        </div>`;
+    }).join('');
     return `
-      <div class="contrib-row">
-        <span class="contrib-avatar">${k.avatar||'🙂'}</span>
-        <span class="contrib-name" style="color:#fff">${esc(k.name)}</span>
-        <div class="contrib-bar-bg"><div class="contrib-fill" style="width:${pctBar}%"></div></div>
-        <span class="contrib-val">${c}</span>
+      <div class="goal-card" style="margin-bottom:14px">
+        <span class="goal-icon">${g.icon||'🏆'}</span>
+        <div class="goal-title">${esc(g.title)}</div>
+        <div class="goal-sub">${total} / ${target} pts</div>
+        <div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${pct}%"></div></div>
+        <div class="goal-pts">${pct}% there! ${reached?'🏆 Goal reached!':''}</div>
+        ${kids.length>1?`<div style="height:14px"></div>${contribs}`:''}
+        ${!reached?`
+          <div style="margin-top:14px">
+            ${pts > 0
+              ? `<button class="btn btn-primary btn-full" onclick="showContributeModal('${m.id}','${g.id}')">
+                   ${tiny?'Give Stars! ⭐':'Contribute Points ⭐'}
+                 </button>`
+              : `<div style="text-align:center;font-size:0.85rem;opacity:0.8">Complete chores to earn points first!</div>`}
+          </div>`
+        : `<div style="text-align:center;margin-top:12px;font-size:0.85rem;opacity:0.9">Tell a parent to collect the reward! 🎉</div>`}
       </div>`;
   }).join('');
 
-  const tiny = isTiny(m);
-
-  let html = `
-    <div class="goal-card">
-      <span class="goal-icon">${g.icon||'🎯'}</span>
-      <div class="goal-title">${esc(g.title)}</div>
-      <div class="goal-sub">${total} / ${target} pts</div>
-      <div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${pct}%"></div></div>
-      <div class="goal-pts">${pct}% there! ${pct===100?'🏆 Goal reached!':''}</div>
-      <div style="height:14px"></div>
-      ${contribs}
-    </div>`;
-
-  if (pct < 100) {
-    html += `
-      <div class="card">
-        <div class="card-title">🤝 Your Contribution</div>
-        <div style="margin-bottom:12px;font-size:0.9rem;color:var(--muted)">
-          You've contributed <strong>${myContrib} pts</strong> so far.<br>
-          You have <strong>${pts} pts</strong> available to contribute.
-        </div>
-        ${pts > 0
-          ? `<button class="btn btn-primary btn-full" onclick="showContributeModal('${m.id}')">
-               ${tiny?'Give Stars to the Goal! ⭐':'Contribute Points ⭐'}
-             </button>`
-          : `<p class="text-muted text-center">Complete chores to earn points first!</p>`}
-      </div>`;
-  } else {
-    html += `
-      <div class="card" style="text-align:center;padding:24px">
-        <div style="font-size:3rem">🏆</div>
-        <div style="font-size:1.2rem;font-weight:800;margin:10px 0">Goal Achieved!</div>
-        <div style="color:var(--muted)">Tell a parent to collect the reward!</div>
-      </div>`;
-  }
-
-  document.getElementById('kid-content').innerHTML = html;
+  document.getElementById('kid-content').innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div>
+        <div style="font-size:1.5rem;font-weight:800">⭐ ${pts}</div>
+        <div style="font-size:0.8rem;color:var(--muted)">your points</div>
+      </div>
+      ${tiny?`<div style="font-size:2rem">${m.avatar}</div>`:''}
+    </div>
+    <div class="section-row"><span class="section-title">🏆 Team Prizes</span></div>
+    ${goalCards}`;
 }
 
-function showContributeModal(memberId) {
-  const m = getMember(memberId);
-  if (!m || !D.familyGoal) return;
+function showContributeModal(memberId, goalId) {
+  const m    = getMember(memberId);
+  const goal = D.teamGoals?.find(g => g.id === goalId);
+  if (!m || !goal) return;
   showModal(`
-    <div class="modal-title">🎯 ${esc(D.familyGoal.title)}</div>
+    <div class="modal-title">🏆 ${esc(goal.title)}</div>
     <p style="color:var(--muted);font-size:0.9rem;margin-bottom:16px">
-      You have <strong>${m.points||0} pts</strong>. How many do you want to contribute toward the family goal?
+      You have <strong>${m.points||0} pts</strong>. How many do you want to contribute?
     </p>
     <div class="form-group">
       <label class="form-label">Points to contribute</label>
@@ -4475,20 +4446,21 @@ function showContributeModal(memberId) {
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="doContrib('${memberId}')">Contribute! ⭐</button>
+      <button class="btn btn-primary" onclick="doContrib('${memberId}','${goalId}')">Contribute! ⭐</button>
     </div>`);
 }
 
-function doContrib(memberId) {
-  const pts = parseInt(document.getElementById('contrib-pts')?.value)||0;
+function doContrib(memberId, goalId) {
+  const pts  = parseInt(document.getElementById('contrib-pts')?.value)||0;
+  const goal = D.teamGoals?.find(g => g.id === goalId);
   if (pts <= 0) { toast('Enter points to contribute'); return; }
-  const ok = doContributeToGoal(memberId, pts);
+  const ok = doContributeToGoal(memberId, goalId, pts);
   closeModal();
   if (!ok) { toast('Not enough points!'); return; }
-  toast(`+${pts} pts contributed to the family goal! 🎯`);
+  toast(`+${pts} pts contributed to "${goal?.title}"! 🏆`);
   const m = getMember(memberId);
-  if (isTiny(m)) speak(`You gave ${pts} stars to the family goal! Amazing!`);
-  renderKidGoal();
+  if (isTiny(m)) speak(`You gave ${pts} stars to the team! Amazing!`);
+  renderKidTeam();
   renderKidHeader();
 }
 
@@ -4830,20 +4802,19 @@ function renderParentHome() {
     html += `</div>`;
   }
 
-  // Family goal progress
-  const g = D.familyGoal;
-  if (g) {
-    const total  = goalTotal();
+  // Team goals progress
+  (D.teamGoals||[]).forEach(g => {
+    const total  = goalTotal(g);
     const target = g.targetPoints||1;
     const pct    = Math.min(100,Math.round(total/target*100));
     html += `
       <div class="goal-card">
-        <span class="goal-icon">${g.icon||'🎯'}</span>
+        <span class="goal-icon">${g.icon||'🏆'}</span>
         <div class="goal-title">${esc(g.title)}</div>
         <div class="goal-sub">${total} / ${target} pts · ${pct}%</div>
         <div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${pct}%"></div></div>
       </div>`;
-  }
+  });
 
   // Kids overview
   let kidsHtml = '';
@@ -5585,23 +5556,24 @@ function deleteChore(choreId) {
 
 // ── PARENT PRIZES ─────────────────────────────────────────────
 function renderParentPrizes() {
+  const indiv = D.prizes.filter(p => p.type === 'individual');
   let html = `
     <div class="section-row">
-      <span class="section-title">🎁 Prizes (${D.prizes.length})</span>
+      <span class="section-title">🎁 Individual Prizes (${indiv.length})</span>
       <button class="btn btn-primary btn-sm" onclick="showPrizeModal()">+ Add</button>
     </div>`;
 
-  if (D.prizes.length === 0) {
+  if (indiv.length === 0) {
     html += `<div class="empty-state"><div class="empty-icon">🎁</div><div class="empty-text">No prizes yet. Add one!</div></div>`;
   }
 
-  D.prizes.forEach(p => {
+  indiv.forEach(p => {
     html += `
       <div class="admin-card">
         <span class="admin-icon">${p.icon}</span>
         <div class="admin-info">
           <div class="admin-name">${esc(p.title)}</div>
-          <div class="admin-meta">${p.cost} pts · <span class="badge ${p.type==='family'?'badge-teal':'badge-purple'}">${p.type}</span></div>
+          <div class="admin-meta">${p.cost} pts</div>
         </div>
         <div class="admin-actions">
           <button class="btn-icon-sm btn-icon-edit"   onclick="showPrizeModal('${p.id}')">✏️</button>
@@ -5610,19 +5582,24 @@ function renderParentPrizes() {
       </div>`;
   });
 
-  // Family goal section
+  // Team goals section
+  const goals = D.teamGoals || [];
   html += `<div class="divider"></div>
     <div class="section-row">
-      <span class="section-title">🎯 Family Goal</span>
-      <button class="btn btn-teal btn-sm" onclick="showGoalModal()">Edit</button>
+      <span class="section-title">🏆 Team Prizes (${goals.length})</span>
+      <button class="btn btn-teal btn-sm" onclick="showGoalModal()">+ Add</button>
     </div>`;
-  const g = D.familyGoal;
-  if (g) {
-    const total = goalTotal();
+
+  if (goals.length === 0) {
+    html += `<div class="empty-state" style="padding:20px"><div class="empty-icon">🏆</div><div class="empty-text">No team prizes yet</div></div>`;
+  }
+
+  goals.forEach(g => {
+    const total = goalTotal(g);
     const pct   = Math.min(100,Math.round(total/(g.targetPoints||1)*100));
     html += `
       <div class="admin-card">
-        <span class="admin-icon">${g.icon||'🎯'}</span>
+        <span class="admin-icon">${g.icon||'🏆'}</span>
         <div class="admin-info">
           <div class="admin-name">${esc(g.title)}</div>
           <div class="admin-meta">${total} / ${g.targetPoints} pts · ${pct}%</div>
@@ -5630,11 +5607,12 @@ function renderParentPrizes() {
             <div class="progress-fill teal" style="width:${pct}%"></div>
           </div>
         </div>
-        <button class="btn-icon-sm btn-icon-delete" onclick="clearGoal()">🗑️</button>
+        <div class="admin-actions">
+          <button class="btn-icon-sm btn-icon-edit"   onclick="showGoalModal('${g.id}')">✏️</button>
+          <button class="btn-icon-sm btn-icon-delete" onclick="clearGoal('${g.id}')">🗑️</button>
+        </div>
       </div>`;
-  } else {
-    html += `<div class="empty-state" style="padding:20px"><div class="empty-icon">🎯</div><div class="empty-text">No family goal yet</div></div>`;
-  }
+  });
 
   document.getElementById('parent-content').innerHTML = html;
 }
@@ -5658,18 +5636,9 @@ function showPrizeModal(prizeId) {
       <label class="form-label">Prize name</label>
       <input type="text" id="pm-title" placeholder="e.g. Movie Night Pick" value="${esc(p.title)}">
     </div>
-    <div class="input-row">
-      <div class="form-group mb-0">
-        <label class="form-label">Points cost</label>
-        <input type="number" id="pm-cost" min="1" value="${p.cost}">
-      </div>
-      <div class="form-group mb-0">
-        <label class="form-label">Type</label>
-        <select id="pm-type">
-          <option value="individual" ${p.type==='individual'?'selected':''}>Individual</option>
-          <option value="family"     ${p.type==='family'    ?'selected':''}>Family</option>
-        </select>
-      </div>
+    <div class="form-group">
+      <label class="form-label">Points cost</label>
+      <input type="number" id="pm-cost" min="1" value="${p.cost}">
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
@@ -5687,14 +5656,13 @@ function savePrize(prizeId) {
   const title = document.getElementById('pm-title')?.value.trim();
   const icon  = document.getElementById('pm-icon')?.value || '🎁';
   const cost  = parseInt(document.getElementById('pm-cost')?.value)||100;
-  const type  = document.getElementById('pm-type')?.value || 'individual';
   if (!title) { toast('Enter a prize name'); return; }
 
   if (prizeId) {
     const p = D.prizes.find(x=>x.id===prizeId);
-    if (p) Object.assign(p, { title, icon, cost, type });
+    if (p) Object.assign(p, { title, icon, cost, type:'individual' });
   } else {
-    D.prizes.push({ id:genId(), title, icon, cost, type, redemptions:[] });
+    D.prizes.push({ id:genId(), title, icon, cost, type:'individual', redemptions:[] });
   }
   saveData();
   closeModal();
@@ -5710,21 +5678,23 @@ function deletePrize(prizeId) {
   renderParentPrizes();
 }
 
-function showGoalModal() {
-  const g = D.familyGoal || { title:'', icon:'🎯', targetPoints:500 };
-  const iconOpts = ['🎯','🏰','✈️','🎪','🏖️','🎢','🎡','🏕️','⛷️','🚢','🎠','🎭'].map(ic =>
+function showGoalModal(goalId) {
+  const existing = goalId ? D.teamGoals?.find(g => g.id === goalId) : null;
+  const g = existing || { title:'', icon:'🏆', targetPoints:500 };
+  const iconOpts = ['🏆','🎯','🏰','✈️','🎪','🏖️','🎢','🎡','🏕️','⛷️','🚢','🎠','🎭','🎬','🍕','🎮'].map(ic =>
     `<div class="icon-opt${ic===g.icon?' sel':''}" onclick="selGoalIcon(this,'${ic}')">${ic}</div>`
   ).join('');
 
   showModal(`
-    <div class="modal-title">🎯 Family Goal</div>
-    <input type="hidden" id="gm-icon" value="${g.icon||'🎯'}">
+    <div class="modal-title">${existing?'Edit':'Add'} Team Prize</div>
+    <input type="hidden" id="gm-id" value="${goalId||''}">
+    <input type="hidden" id="gm-icon" value="${g.icon||'🏆'}">
     <div class="form-group">
       <label class="form-label">Icon</label>
       <div class="icon-picker" style="grid-template-columns:repeat(6,1fr)">${iconOpts}</div>
     </div>
     <div class="form-group">
-      <label class="form-label">Goal name</label>
+      <label class="form-label">Prize name</label>
       <input type="text" id="gm-title" placeholder="e.g. Disney Trip!" value="${esc(g.title)}">
     </div>
     <div class="form-group">
@@ -5733,7 +5703,7 @@ function showGoalModal() {
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-teal" onclick="saveGoal()">Save Goal ✓</button>
+      <button class="btn btn-teal" onclick="saveGoal()">Save ✓</button>
     </div>`);
 }
 
@@ -5744,21 +5714,28 @@ function selGoalIcon(el, icon) {
 }
 
 function saveGoal() {
+  const goalId = document.getElementById('gm-id')?.value;
   const title  = document.getElementById('gm-title')?.value.trim();
-  const icon   = document.getElementById('gm-icon')?.value || '🎯';
+  const icon   = document.getElementById('gm-icon')?.value || '🏆';
   const target = parseInt(document.getElementById('gm-target')?.value)||500;
-  if (!title) { toast('Enter a goal name'); return; }
+  if (!title) { toast('Enter a prize name'); return; }
 
-  D.familyGoal = { title, icon, targetPoints:target, contributions: D.familyGoal?.contributions||{} };
+  if (!D.teamGoals) D.teamGoals = [];
+  if (goalId) {
+    const g = D.teamGoals.find(x => x.id === goalId);
+    if (g) Object.assign(g, { title, icon, targetPoints: target });
+  } else {
+    D.teamGoals.push({ id: genId(), title, icon, targetPoints: target, contributions: {} });
+  }
   saveData();
   closeModal();
-  toast('Family goal saved!');
+  toast(goalId ? 'Team prize updated!' : 'Team prize added!');
   renderParentPrizes();
 }
 
-function clearGoal() {
-  if (!confirm('Remove the family goal?')) return;
-  D.familyGoal = null;
+function clearGoal(goalId) {
+  if (!confirm('Remove this team prize?')) return;
+  D.teamGoals = (D.teamGoals||[]).filter(g => g.id !== goalId);
   saveData();
   renderParentPrizes();
 }
@@ -6212,7 +6189,7 @@ function _advRender() {
             <input type="text" class="adv-field-input" style="flex:1;min-width:80px" value="${esc(c.title||'')}" placeholder="title"
               onchange="advSetChore('${c.id}','title',this.value)">
           </div>
-          ${completionRows ? `<details style="margin-top:4px"><summary style="font-size:0.72rem;color:#6b7280;cursor:pointer;padding:2px 0">Completions ▸</summary><div style="padding:4px 0 0 8px">${completionRows}</div></details>` : ''}
+          ${completionRows ? `<details style="margin-top:4px"><summary style="font-size:0.72rem;color:#6b7280;cursor:pointer;padding:2px 0">Completions ▸ <span style="color:#d97706;font-weight:600">${(c.schedule||c).period==='once'?'(once — stays done until cleared)':''}</span></summary><div style="padding:4px 0 0 8px">${completionRows}</div></details>` : ''}
         </div>`;
     }).join('');
 
@@ -6271,15 +6248,19 @@ function _advRender() {
         </div>`;
       }).join('');
 
-  // ── Family Goal section ──
-  const g = D.familyGoal || {};
-  const goalHtml = `
-    ${_advField('Title',      _advInput('text',   g.title||'',          `D.familyGoal=D.familyGoal||{};D.familyGoal.title=this.value;saveData();_advRefreshStatus('Saved')`))}
-    ${_advField('Icon',       _advInput('text',   g.icon||'',           `D.familyGoal=D.familyGoal||{};D.familyGoal.icon=this.value;saveData();_advRefreshStatus('Saved')`))}
-    ${_advField('Target Pts', _advInput('number', g.targetPoints||0,    `D.familyGoal=D.familyGoal||{};D.familyGoal.targetPoints=+this.value;saveData();_advRefreshStatus('Saved')`))}
-    ${_advField('Description',_advInput('text',   g.description||'',    `D.familyGoal=D.familyGoal||{};D.familyGoal.description=this.value;saveData();_advRefreshStatus('Saved')`))}
-    <div style="margin-top:6px"><button class="adv-danger-btn" style="font-size:0.8rem;padding:7px 14px"
-      onclick="if(confirm('Clear family goal?')){D.familyGoal=null;saveData();_advRender();}">Clear Goal</button></div>`;
+  // ── Team Goals section ──
+  const teamGoals = D.teamGoals || [];
+  const goalHtml = teamGoals.length === 0
+    ? '<div style="color:#9ca3af;font-size:0.85rem">No team prizes yet</div>'
+    : teamGoals.map((g,i) => `
+      <div style="border:1px solid #e5e7eb;border-radius:8px;padding:10px;margin-bottom:8px">
+        ${_advField('Title',      _advInput('text',   g.title||'',       `D.teamGoals[${i}].title=this.value;saveData();_advRefreshStatus('Saved')`))}
+        ${_advField('Icon',       _advInput('text',   g.icon||'',        `D.teamGoals[${i}].icon=this.value;saveData();_advRefreshStatus('Saved')`))}
+        ${_advField('Target Pts', _advInput('number', g.targetPoints||0, `D.teamGoals[${i}].targetPoints=+this.value;saveData();_advRefreshStatus('Saved')`))}
+        ${_advField('Saved So Far', `<span style="font-size:0.85rem;font-weight:700;color:var(--teal)">${goalTotal(g)} pts</span>`)}
+        <div style="margin-top:6px"><button class="adv-danger-btn" style="font-size:0.78rem;padding:5px 12px"
+          onclick="if(confirm('Remove this team prize?')){D.teamGoals.splice(${i},1);saveData();_advRender();}">Remove</button></div>
+      </div>`).join('');
 
   root.innerHTML = `
     <div class="adv-editor-header">
@@ -6311,7 +6292,7 @@ function _advRender() {
       </div>
 
       <div class="adv-section">
-        <div class="adv-section-heading">🎯 Family Goal</div>
+        <div class="adv-section-heading">🏆 Team Prizes (${teamGoals.length})</div>
         <div class="adv-section-body">${goalHtml}</div>
       </div>
 
@@ -6677,21 +6658,20 @@ function renderGrandmaFamily() {
     html += `</div>`;
   });
 
-  // Family goal
-  const g = D.familyGoal;
-  if (g) {
-    const total  = goalTotal();
+  // Team goals
+  (D.teamGoals||[]).forEach(g => {
+    const total  = goalTotal(g);
     const target = g.targetPoints||1;
     const pct    = Math.min(100,Math.round(total/target*100));
     html += `
       <div class="card" style="background:linear-gradient(135deg,var(--purple),var(--pink));color:#fff;border-radius:18px">
-        <div style="font-size:1.3rem;font-weight:800;margin-bottom:4px">🎯 Family Goal: ${esc(g.title)}</div>
+        <div style="font-size:1.3rem;font-weight:800;margin-bottom:4px">🏆 Team Prize: ${esc(g.title)}</div>
         <div style="margin-bottom:12px;opacity:0.85">${total} of ${target} points saved · ${pct}%</div>
         <div style="background:rgba(255,255,255,0.3);border-radius:999px;height:14px;overflow:hidden">
           <div style="width:${pct}%;height:100%;background:var(--yellow);border-radius:999px;transition:width 0.5s"></div>
         </div>
       </div>`;
-  }
+  });
 
   if (kids.length === 0) {
     html = `<div class="empty-state"><div class="empty-icon">👶</div><div class="empty-text">No kids in the family yet.</div></div>`;
