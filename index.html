@@ -4605,7 +4605,6 @@ function parentMarkChoreDone(choreId, memberId) {
   const member = getMember(memberId);
   if (!chore || !member) return;
 
-  // Check if already done to avoid double-crediting
   const progress = getChoreProgress(chore, memberId);
   if (progress.status === 'done') {
     toast(`${chore.icon} Already marked done for ${member.name}`);
@@ -4614,16 +4613,34 @@ function parentMarkChoreDone(choreId, memberId) {
 
   if (!chore.completions) chore.completions = {};
   chore.completions[memberId] = normalizeCompletionEntries(chore.completions[memberId]);
-  chore.completions[memberId].push({
-    id: genId(), status: 'done', date: today(), createdAt: Date.now(),
-    slotId: null, photoUrl: null, entryType: null,
-  });
-  member.points      = (member.points      || 0) + chore.points;
-  member.totalEarned = (member.totalEarned || 0) + chore.points;
-  addHistory('chore', memberId, chore.title, chore.points);
-  checkAfterPointsAwarded(member, chore.points);
+
+  let totalPts = 0;
+
+  if (progress.isSlotMode) {
+    // Complete every slot that isn't already done or pending
+    const incomplete = (progress.slotStatuses || []).filter(s => s.status !== 'done' && s.status !== 'pending');
+    if (incomplete.length === 0) { toast(`${chore.icon} All slots already submitted for ${member.name}`); return; }
+    incomplete.forEach(({ slot }) => {
+      chore.completions[memberId].push({
+        id: genId(), status: 'done', date: today(), createdAt: Date.now(),
+        slotId: slot.id, photoUrl: null, entryType: null,
+      });
+      totalPts += chore.points;
+    });
+  } else {
+    chore.completions[memberId].push({
+      id: genId(), status: 'done', date: today(), createdAt: Date.now(),
+      slotId: null, photoUrl: null, entryType: null,
+    });
+    totalPts = chore.points;
+  }
+
+  member.points      = (member.points      || 0) + totalPts;
+  member.totalEarned = (member.totalEarned || 0) + totalPts;
+  addHistory('chore', memberId, chore.title, totalPts);
+  checkAfterPointsAwarded(member, totalPts);
   saveData();
-  toast(`✅ Marked "${chore.title}" done for ${member.name} (+${chore.points} pts)`);
+  toast(`✅ Marked "${chore.title}" done for ${member.name} (+${totalPts} pts)`);
   renderParentHome();
   renderParentHeader();
   renderParentNav();
@@ -5631,6 +5648,21 @@ function renderParentSettings() {
       </div>
     </div>
 
+    <div class="card" style="border:2px solid #6366F1">
+      <div class="card-title" style="color:#6366F1">🔧 Testing &amp; Debug</div>
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:14px">Manually adjust any kid's points for testing.</p>
+      ${kids.map(k => `
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <span style="font-size:1.4rem">${k.avatar||'🙂'}</span>
+          <div style="flex:1;font-weight:700;font-size:0.9rem">${esc(k.name)}</div>
+          <input type="number" id="dbg-pts-${k.id}" value="${k.points||0}" min="0"
+                 style="width:80px;text-align:center;font-size:1rem;font-weight:700;
+                        border:1.5px solid var(--border);border-radius:8px;padding:6px 4px">
+          <button class="btn btn-secondary btn-sm"
+                  onclick="debugSetPoints('${k.id}')">Set</button>
+        </div>`).join('')}
+    </div>
+
     <div class="card" style="border:2px solid #FEE2E2">
       <div class="card-title" style="color:#EF4444">⚠️ Danger Zone</div>
       <button class="btn btn-danger btn-sm" onclick="resetAllData()" style="width:100%">Reset All Data</button>
@@ -5642,6 +5674,21 @@ function renderParentSettings() {
 function saveSetting(key, value) {
   D.settings[key] = value;
   saveData();
+}
+
+function debugSetPoints(memberId) {
+  const member = getMember(memberId);
+  if (!member) return;
+  const input = document.getElementById(`dbg-pts-${memberId}`);
+  const newPts = parseInt(input?.value, 10);
+  if (isNaN(newPts) || newPts < 0) { toast('Enter a valid number'); return; }
+  const diff = newPts - (member.points || 0);
+  member.points = newPts;
+  if (diff !== 0) addHistory('penalty', memberId, `🔧 Manual adjustment`, diff);
+  saveData();
+  renderParentHeader();
+  renderParentNav();
+  toast(`✅ ${member.name}'s points set to ${newPts}`);
 }
 
 function showAddPointsModal(memberId) {
