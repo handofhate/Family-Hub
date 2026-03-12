@@ -2767,7 +2767,7 @@ function checkComboBonus(memberId) {
   member.points      = (member.points      || 0) + bonusPts;
   member.totalEarned = (member.totalEarned || 0) + bonusPts;
   if (D.settings.levelingEnabled !== false) member.xp = (member.xp || 0) + bonusPts;
-  addHistory('chore', memberId, '⚡ Daily Combo Bonus!', bonusPts);
+  addHistory('bonus', memberId, '⚡ Daily Combo Bonus!', bonusPts);
 
   // Update combo streak
   normalizeMember(member);
