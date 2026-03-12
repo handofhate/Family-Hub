@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Family Hub">
   <meta name="theme-color" content="#6C63FF">
@@ -37,6 +37,7 @@
       min-height: 100vh;
       overflow-x: hidden;
       -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation; /* disable double-tap zoom */
     }
 
     /* ══════════════════════════════════════════
@@ -3613,7 +3614,8 @@ function renderKidChores() {
 
   const progressMap = new Map(myChores.map(chore => [chore.id, getChoreProgress(chore, m.id)]));
   const done        = myChores.filter(c => progressMap.get(c.id)?.status === 'done');
-  const pending     = myChores.filter(c => ['pending','partial'].includes(progressMap.get(c.id)?.status));
+  const awaiting    = myChores.filter(c => progressMap.get(c.id)?.status === 'pending');
+  const partial     = myChores.filter(c => progressMap.get(c.id)?.status === 'partial');
   const todo        = myChores.filter(c => progressMap.get(c.id)?.status === 'none');
   const unavailable = myChores.filter(c => progressMap.get(c.id)?.status === 'unavailable');
 
@@ -3636,7 +3638,7 @@ function renderKidChores() {
           <div style="font-size:1.6rem;font-weight:800">${doneUnits} / ${totalUnits || myChores.length}</div>
           <div style="opacity:0.85;font-size:0.85rem">completions finished right now</div>
         </div>
-        <div style="font-size:${tiny?'3rem':'2rem'}">${pct===100?'🏆':m.avatar||'⭐'}</div>
+        <div style="font-size:${isTiny(m)?'3rem':'2rem'}">${pct===100?'🏆':m.avatar||'⭐'}</div>
       </div>
       <div style="background:rgba(255,255,255,0.3);border-radius:999px;height:10px;overflow:hidden">
         <div style="width:${pct}%;height:100%;border-radius:999px;background:#FFD93D;transition:width 0.5s"></div>
@@ -3679,11 +3681,24 @@ function renderKidChores() {
     html += `</div>`;
   }
 
-  // Pending / partial
-  if (pending.length > 0) {
-    html += `<div class="card-title mt-12">⏳ In Progress</div>`;
+  // Partial slot chores (some slots done, not all)
+  if (partial.length > 0) {
+    partial.forEach(c => {
+      const p = progressMap.get(c.id);
+      const done_ = p?.doneCount || 0;
+      const total_ = p?.targetCount || p?.slotStatuses?.length || '?';
+      html += `<div class="card-title mt-12">✨ ${done_} of ${total_} Done</div>`;
+      html += `<div>`;
+      html += normalChoreCard(c, m, p, comboIds);
+      html += `</div>`;
+    });
+  }
+
+  // Awaiting parent approval
+  if (awaiting.length > 0) {
+    html += `<div class="card-title mt-12">⏳ Waiting for Approval</div>`;
     html += `<div id="sort-pending">`;
-    pending.forEach(c => { html += normalChoreCard(c, m, progressMap.get(c.id), comboIds); });
+    awaiting.forEach(c => { html += normalChoreCard(c, m, progressMap.get(c.id), comboIds); });
     html += `</div>`;
   }
 
@@ -4498,13 +4513,20 @@ function renderParentHome() {
     const choreRows = myChores.length === 0
       ? `<div class="empty-state" style="padding:16px 8px"><div class="empty-text">No chores assigned</div></div>`
       : `<div class="kid-overview-list">${myChores.map(chore => {
-          const status = choreStatus(chore, kid.id);
+          const progress = getChoreProgress(chore, kid.id);
+          const status = progress.status;
           const isDone = status === 'done';
-          const statusClass = isDone ? 'done' : ['pending','partial'].includes(status) ? 'pending' : 'todo';
-          const statusLabel = isDone ? 'Done' : ['pending','partial'].includes(status) ? 'In progress' : status === 'unavailable' ? 'Later' : 'To do';
-          const markDoneBtn = !isDone
-            ? `<button class="btn-icon-sm btn-icon-approve" style="margin-left:6px;flex-shrink:0" title="Mark done (award points)" onclick="parentMarkChoreDone('${chore.id}','${kid.id}')">✓</button>`
-            : '';
+          const slotsDone  = progress.doneCount || 0;
+          const slotsTotal = progress.targetCount || progress.slotStatuses?.length || 0;
+          const statusClass = isDone ? 'done' : status === 'partial' ? 'pending' : status === 'pending' ? 'pending' : 'todo';
+          const statusLabel = isDone ? 'Done'
+            : status === 'partial'      ? `${slotsDone}/${slotsTotal} done`
+            : status === 'pending'      ? 'Waiting'
+            : status === 'unavailable'  ? 'Later'
+            : 'To do';
+          const markDoneBtn = isDone
+            ? `<button class="btn-icon-sm btn-icon-delete" style="margin-left:6px;flex-shrink:0" title="Remove completion" onclick="parentUnmarkChoreDone('${chore.id}','${kid.id}')">↩</button>`
+            : `<button class="btn-icon-sm btn-icon-approve" style="margin-left:6px;flex-shrink:0" title="Mark done (award points)" onclick="parentMarkChoreDone('${chore.id}','${kid.id}')">✓</button>`;
           return `
             <div class="kid-overview-item">
               <div style="flex:1;min-width:0">
@@ -4602,6 +4624,34 @@ function parentMarkChoreDone(choreId, memberId) {
   checkAfterPointsAwarded(member, chore.points);
   saveData();
   toast(`✅ Marked "${chore.title}" done for ${member.name} (+${chore.points} pts)`);
+  renderParentHome();
+  renderParentHeader();
+  renderParentNav();
+}
+
+function parentUnmarkChoreDone(choreId, memberId) {
+  const chore  = D.chores.find(c => c.id === choreId);
+  const member = getMember(memberId);
+  if (!chore || !member) return;
+
+  const entries = normalizeCompletionEntries(chore.completions?.[memberId]);
+  // Find the most recent 'done' entry that is NOT a 'before' photo entry
+  const idx = [...entries].reverse().findIndex(e => e.status === 'done' && e.entryType !== 'before');
+  if (idx === -1) { toast('No completion found to remove'); return; }
+  const realIdx = entries.length - 1 - idx;
+
+  entries.splice(realIdx, 1);
+  if (entries.length === 0) delete chore.completions[memberId];
+  else chore.completions[memberId] = entries;
+
+  // Reverse the points
+  const deduct = Math.min(chore.points, member.points || 0);
+  member.points      = (member.points      || 0) - deduct;
+  member.totalEarned = Math.max(0, (member.totalEarned || 0) - chore.points);
+  if (D.settings.levelingEnabled !== false) member.xp = Math.max(0, (member.xp || 0) - chore.points);
+  addHistory('penalty', memberId, `↩ Removed: ${chore.title}`, -deduct);
+  saveData();
+  toast(`↩ Removed "${chore.title}" completion for ${member.name} (−${deduct} pts)`);
   renderParentHome();
   renderParentHeader();
   renderParentNav();
