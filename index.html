@@ -2119,6 +2119,12 @@ function normalizeChore(chore) {
     completions[memberId] = normalizeCompletionEntries(entries);
   });
 
+  const title = chore?.title || '';
+  const choreBadges = Array.isArray(chore?.badges) ? chore.badges : (() => {
+    const preset = CHORE_BADGE_PRESETS[title];
+    return preset ? preset.map(b => ({ id: genId(), ...b })) : [];
+  })();
+
   return {
     ...chore,
     frequency: period,
@@ -2128,6 +2134,7 @@ function normalizeChore(chore) {
     assignedTo: Array.isArray(chore?.assignedTo) ? chore.assignedTo : [],
     description: chore?.description || '',
     completions,
+    badges: choreBadges,
     schedule: {
       period,
       targetCount,
@@ -2487,6 +2494,7 @@ function doCompleteChore(choreId, memberId, slotId = null, photoUrl = null, entr
     member.totalEarned = (member.totalEarned || 0) + chore.points;
     addHistory('chore', memberId, chore.title, chore.points);
     checkAfterPointsAwarded(member, chore.points);
+    checkChoreBadges(chore, memberId);
     saveData();
     return { approved: true, points: chore.points };
   } else {
@@ -2513,6 +2521,7 @@ function doApproveChore(choreId, memberId, entryId) {
     member.totalEarned = (member.totalEarned || 0) + chore.points;
     addHistory('chore', memberId, chore.title, chore.points);
     checkAfterPointsAwarded(member, chore.points);
+    checkChoreBadges(chore, memberId);
   }
   saveData();
 }
@@ -2575,6 +2584,22 @@ const DEFAULT_LEVELS = [
   { level:7, name:'Master',  icon:'👑', minXp:1200 },
 ];
 
+const CHORE_BADGE_PRESETS = {
+  'Brush Your Teeth':      [{ count:10, name:'Junior Dentist', icon:'🦷' }, { count:25, name:'Strong Chomper', icon:'💪' }, { count:50, name:'Dental Surgeon', icon:'⚕️' }],
+  'Take A Shower':         [{ count:10, name:'Getting Soapy',  icon:'🚿' }, { count:25, name:'Bubble Boy',     icon:'🫧' }, { count:50, name:'Scrub Master',   icon:'🧼' }],
+  'Dress Yourself':        [{ count:10, name:'Cool Guy',       icon:'😎' }, { count:25, name:'Style Pro',      icon:'👔' }, { count:50, name:'Fashion God',    icon:'👑' }],
+  'Hug Your Brother':      [{ count:10, name:'Bro-migo',       icon:'🤜' }, { count:25, name:'Bro-chacho',     icon:'🤛' }, { count:50, name:'Bro-tato Chip',  icon:'🥔' }],
+  'Hug Your Grandma':      [{ count:10, name:'OK Fine',        icon:'😒' }, { count:25, name:'Granny Fan',     icon:'💜' }, { count:50, name:'I Love Grandma', icon:'🫶' }],
+  'Set The Table':         [{ count:10, name:'Fork!',          icon:'🍴' }, { count:25, name:'Threek!',        icon:'🥄' }, { count:50, name:'Twok!',          icon:'🍽️' }, { count:100, name:'Onek!', icon:'🏆' }],
+  'Clear The Table':       [{ count:10, name:"That's Beans!",  icon:'🫘' }, { count:25, name:'Dishwasher',     icon:'🫧' }, { count:50, name:'Top Chef',       icon:'👨‍🍳' }],
+  'Help Pack Your Lunch':  [{ count:10, name:'Fruit Snack',    icon:'🍎' }, { count:25, name:'Juice Box',      icon:'🧃' }, { count:50, name:'Uncrustable',    icon:'🥪' }],
+  'Take Out The Trash':    [{ count:10, name:'Stinky',         icon:'🤢' }, { count:25, name:'Janitor',        icon:'🧹' }, { count:50, name:'Garbageman',     icon:'🗑️' }],
+  "Refill The Cats' Food": [{ count:10, name:'Animal Lover',   icon:'🐾' }, { count:25, name:'Cat Guy',        icon:'🐱' }, { count:50, name:'Kitty God',      icon:'😺' }],
+  "Refill The Cats' Water":[{ count:10, name:"Just Sippin'",   icon:'💧' }, { count:25, name:'Gulp Gulp',      icon:'🥤' }, { count:50, name:'Swimmer Kitty',  icon:'🏊' }],
+  'Help With Laundry':     [{ count:10, name:'Sock Collector', icon:'🧦' }, { count:25, name:'Hamper Stacker', icon:'🧺' }, { count:50, name:'Clothing King',  icon:'👗' }],
+  'Clean Your Room':       [{ count:10, name:"Don't Trip!",    icon:'🚧' }, { count:25, name:'Relax Mode',     icon:'😌' }, { count:50, name:'Blanket Boy',    icon:'🛏️' }],
+};
+
 const BADGE_DEFS = [
   { id:'first_chore',  icon:'✅', name:'First Chore',    desc:'Complete your very first chore' },
   { id:'streak_3',     icon:'🔥', name:'On a Roll',      desc:'3-day streak' },
@@ -2618,6 +2643,22 @@ function checkPointBadges(member) {
   if (xp >= 200)  awardBadgeIfNew(member, 'pts_200');
   if (xp >= 500)  awardBadgeIfNew(member, 'pts_500');
   if (xp >= 1000) awardBadgeIfNew(member, 'pts_1000');
+}
+
+function checkChoreBadges(chore, memberId) {
+  if (!chore?.badges?.length) return;
+  const member = getMember(memberId);
+  if (!member) return;
+  const allEntries = normalizeCompletionEntries(chore.completions?.[memberId]);
+  const doneCount = allEntries.filter(e => e.status === 'done').length;
+  if (!Array.isArray(member.badges)) member.badges = [];
+  for (const badge of chore.badges) {
+    const key = `cb_${badge.id}`;
+    if (doneCount >= badge.count && !member.badges.includes(key)) {
+      member.badges.push(key);
+      toast(`${badge.icon} New badge: ${badge.name}! (${chore.title} × ${badge.count})`);
+    }
+  }
 }
 
 function checkLevelUp(member, prevLevel) {
@@ -4598,7 +4639,7 @@ function buildMemberStats(member) {
     nlLifetimeSecs:   nlSecs,
     nlFmt,
     totalXP:          member.xp || member.totalEarned || 0,
-    badgeCount:       (member.badges || []).length,
+    badgeCount:       (member.badges || []).length,  // includes standard + chore badges
     bestStreak:       member.streak?.best || 0,
     currentStreak:    member.streak?.current || 0,
     bestComboStreak:  member.comboStreak?.best || 0,
@@ -4671,6 +4712,24 @@ function renderMemberStatsCard(member) {
     _statTile('💰','Saved Up', `${s.savings}★`, '#166534')
   );
 
+  // Build chore badge display
+  const choreBadgeKeys = (member.badges||[]).filter(b => b.startsWith('cb_'));
+  const choreBadgeLookup = {};
+  for (const chore of D.chores) {
+    for (const b of (chore.badges||[])) choreBadgeLookup[`cb_${b.id}`] = { ...b, choreTitle: chore.title };
+  }
+  const choreBadgeGrid = choreBadgeKeys.length === 0 ? '' : `
+    <div style="margin-bottom:18px">
+      <div style="font-size:0.78rem;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#9ca3af;margin-bottom:8px">🏅 Chore Badges</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${choreBadgeKeys.map(key => {
+          const def = choreBadgeLookup[key];
+          return def ? `<div title="${esc(def.choreTitle)} × ${def.count}" style="background:#fff;border-radius:12px;padding:8px 10px;box-shadow:0 1px 4px rgba(0,0,0,0.07);display:flex;align-items:center;gap:6px;font-size:0.82rem;font-weight:600">
+            <span style="font-size:1.3rem">${def.icon}</span>${esc(def.name)}</div>` : '';
+        }).join('')}
+      </div>
+    </div>`;
+
   const badgeSection = _statSection('🎖️ Achievements',
     _statTile('🎖️','Badges', s.badgeCount, '#7c3aed') +
     _statTile('📈','Level-Ups', s.levelUps, '#0f766e') +
@@ -4731,6 +4790,7 @@ function renderMemberStatsCard(member) {
       ${levelSection}
       ${rewardSection}
       ${badgeSection}
+      ${choreBadgeGrid}
       ${penaltySection}
       ${extraSection}
       ${choreTable}
@@ -5034,6 +5094,7 @@ function parentMarkChoreDone(choreId, memberId) {
   member.totalEarned = (member.totalEarned || 0) + totalPts;
   addHistory('chore', memberId, chore.title, totalPts);
   checkAfterPointsAwarded(member, totalPts);
+  checkChoreBadges(chore, memberId);
   saveData();
   toast(`✅ Marked "${chore.title}" done for ${member.name} (+${totalPts} pts)`);
   renderParentHome();
@@ -5088,6 +5149,7 @@ function parentMarkSlotDone(choreId, memberId, slotId) {
   member.totalEarned = (member.totalEarned || 0) + chore.points;
   addHistory('chore', memberId, chore.title, chore.points);
   checkAfterPointsAwarded(member, chore.points);
+  checkChoreBadges(chore, memberId);
   saveData();
   toast(`✅ ${chore.icon} ${slotStatus.slot.label || 'Slot'} done for ${member.name} (+${chore.points} pts)`);
   renderParentHome();
@@ -5247,6 +5309,7 @@ function renderParentChores() {
 
 // Ephemeral slot state while modal is open
 let _editSlots = [];
+let _editBadges = [];
 
 function showChoreModal(choreId) {
   const kids  = D.family.members.filter(m=>m.role==='kid');
@@ -5258,7 +5321,8 @@ function showChoreModal(choreId) {
   });
 
   // Init slot editor state from existing chore
-  _editSlots = c.schedule.slots ? c.schedule.slots.map(s=>({...s})) : [];
+  _editSlots  = c.schedule.slots ? c.schedule.slots.map(s=>({...s})) : [];
+  _editBadges = Array.isArray(c.badges) ? c.badges.map(b=>({...b})) : [];
 
   const iconOpts = EMOJI_MAP.slice(0, 48).map(({e:ic}) =>
     `<div class="icon-opt${ic===c.icon?' sel':''}" onclick="selChoreIcon(this,'${ic}')">${ic}</div>`
@@ -5371,6 +5435,19 @@ function showChoreModal(choreId) {
       <label class="form-label">Description <span class="form-label-hint">optional</span></label>
       <textarea id="cm-desc" placeholder="Any instructions...">${esc(c.description||'')}</textarea>
     </div>
+    <div class="form-group">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <label class="form-label" style="margin-bottom:0">🏅 Chore Badges</label>
+        <label class="toggle" style="transform:scale(0.85);transform-origin:right center">
+          <input type="checkbox" id="cm-badges-on" ${_editBadges.length>0?'checked':''} onchange="toggleBadgeEditor(this.checked)">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div id="cm-badge-editor" style="display:${_editBadges.length>0?'block':'none'}">
+        <div id="cm-badge-list"></div>
+        <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="addChoreBadge()">+ Add Badge</button>
+      </div>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveChore('${choreId||''}')">Save ✓</button>
@@ -5378,6 +5455,7 @@ function showChoreModal(choreId) {
 
   toggleChoreScheduleFields();
   renderSlotEditor();
+  renderBadgeEditor();
 }
 
 // Lazy-loaded emojilib dataset (full ~1800 Unicode emoji with keywords)
@@ -5453,6 +5531,41 @@ function setChoreStyle(style) {
   }
 }
 
+function toggleBadgeEditor(on) {
+  document.getElementById('cm-badge-editor').style.display = on ? 'block' : 'none';
+  if (!on) _editBadges = [];
+  renderBadgeEditor();
+}
+
+function renderBadgeEditor() {
+  const list = document.getElementById('cm-badge-list');
+  if (!list) return;
+  list.innerHTML = _editBadges.map((b, i) => `
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;padding:6px 8px;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb">
+      <input type="text" value="${esc(b.icon||'')}" placeholder="🏅" style="width:44px;font-size:1.2rem;text-align:center;border:1px solid #d1d5db;border-radius:6px;padding:4px"
+        oninput="_editBadges[${i}].icon=this.value">
+      <input type="number" value="${b.count||10}" min="1" placeholder="Count" style="width:60px;border:1px solid #d1d5db;border-radius:6px;padding:4px 6px;font-size:0.85rem"
+        oninput="_editBadges[${i}].count=parseInt(this.value)||1"
+        title="Total completions needed">
+      <input type="text" value="${esc(b.name||'')}" placeholder="Badge name" style="flex:1;border:1px solid #d1d5db;border-radius:6px;padding:4px 6px;font-size:0.85rem"
+        oninput="_editBadges[${i}].name=this.value">
+      <button onclick="removeChoreBadge(${i})" style="background:#FEE2E2;color:#991b1b;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:0.8rem;flex-shrink:0">✕</button>
+    </div>`).join('');
+  const addBtn = document.querySelector('#cm-badge-editor > button');
+  if (addBtn) addBtn.style.display = _editBadges.length >= 5 ? 'none' : '';
+}
+
+function addChoreBadge() {
+  if (_editBadges.length >= 5) return;
+  _editBadges.push({ id: genId(), count: 10, name: '', icon: '🏅' });
+  renderBadgeEditor();
+}
+
+function removeChoreBadge(i) {
+  _editBadges.splice(i, 1);
+  renderBadgeEditor();
+}
+
 function renderSlotEditor() {
   const container = document.getElementById('cm-slot-editor');
   if (!container) return;
@@ -5525,8 +5638,11 @@ function saveChore(choreId) {
     scheduleObj = { period: freq, targetCount: repeatCount, daysOfWeek, windows, slots:null };
   }
 
+  const badges = document.getElementById('cm-badges-on')?.checked
+    ? _editBadges.filter(b => b.name && b.count > 0).map(b => ({ ...b, id: b.id || genId() }))
+    : [];
   const choreData = { title, icon, points, photoMode, frequency: freq,
-    repeatCount: scheduleObj.targetCount, assignedTo: assigned, description: desc, schedule: scheduleObj };
+    repeatCount: scheduleObj.targetCount, assignedTo: assigned, description: desc, schedule: scheduleObj, badges };
 
   if (choreId) {
     const index = D.chores.findIndex(x=>x.id===choreId);
