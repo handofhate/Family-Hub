@@ -989,6 +989,37 @@
       100% { transform: translateY(110vh)  rotate(25deg)  scale(1.1); opacity: 0; }
     }
 
+    /* ══════════════════════════════════════════
+       PULL TO REFRESH
+    ══════════════════════════════════════════ */
+    #ptr-indicator {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 0;
+      overflow: hidden;
+      background: var(--purple);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      z-index: 600;
+      transition: height 0.15s ease;
+    }
+    #ptr-indicator.ptr-refreshing {
+      height: 52px;
+    }
+    .ptr-spinner {
+      width: 18px; height: 18px;
+      border: 3px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: ptrSpin 0.7s linear infinite;
+    }
+    @keyframes ptrSpin { to { transform: rotate(360deg); } }
+
     /* Diamonds burst float */
     .dmds-burst {
       position: fixed;
@@ -1543,6 +1574,7 @@
   </div>
 
   <!-- ═══════════ OVERLAYS ═══════════ -->
+  <div id="ptr-indicator"></div>
   <div id="modal-root"></div>
   <div id="celebration-root"></div>
   <div id="confetti-root"></div>
@@ -3210,6 +3242,79 @@ function renderCurrentView() {
   else if (u.role === 'viewer') renderGrandmaView();
   else renderKidView();
 }
+
+// ── PULL TO REFRESH ────────────────────────────────────────────
+(function setupPullToRefresh() {
+  const indicator = document.getElementById('ptr-indicator');
+  let startY = 0, pulling = false, triggered = false;
+  const THRESHOLD = 72; // px to pull before release triggers refresh
+
+  function setIndicator(pullPx) {
+    if (pullPx <= 0) {
+      indicator.style.height = '0';
+      indicator.innerHTML = '';
+      return;
+    }
+    const pct  = Math.min(pullPx / THRESHOLD, 1);
+    const h    = Math.round(pct * 52);
+    indicator.style.height = h + 'px';
+    indicator.style.transition = 'none';
+    indicator.innerHTML = pullPx >= THRESHOLD
+      ? '<span>↑ Release to refresh</span>'
+      : '<span>↓ Pull to refresh</span>';
+  }
+
+  function doRefresh() {
+    indicator.style.transition = 'height 0.15s ease';
+    indicator.style.height = '52px';
+    indicator.innerHTML = '<div class="ptr-spinner"></div><span>Refreshing…</span>';
+    // Force a fresh Firestore fetch, fall back to local re-render
+    const done = () => {
+      indicator.style.height = '0';
+      setTimeout(() => { indicator.innerHTML = ''; }, 160);
+    };
+    try {
+      db.doc(FAMILY_DOC).get({ source: 'server' }).then(snap => {
+        if (snap.exists) {
+          D = normalizeData(snap.data());
+          try { localStorage.setItem(LS_KEY, JSON.stringify(D)); } catch(e) {}
+        }
+        renderCurrentView();
+        done();
+      }).catch(() => { renderCurrentView(); done(); });
+    } catch(e) { renderCurrentView(); done(); }
+  }
+
+  document.addEventListener('touchstart', e => {
+    // Only pull when the touched scroll container is at the very top
+    const scroller = e.target.closest('.main-content');
+    if (!scroller || scroller.scrollTop > 2) return;
+    startY   = e.touches[0].clientY;
+    pulling  = true;
+    triggered = false;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', e => {
+    if (!pulling) return;
+    const dy = e.touches[0].clientY - startY;
+    if (dy <= 0) { pulling = false; setIndicator(0); return; }
+    setIndicator(dy);
+    if (dy >= THRESHOLD) triggered = true;
+  }, { passive: true });
+
+  document.addEventListener('touchend', () => {
+    if (!pulling) return;
+    pulling = false;
+    if (triggered) {
+      doRefresh();
+    } else {
+      indicator.style.transition = 'height 0.2s ease';
+      indicator.style.height = '0';
+      setTimeout(() => { indicator.innerHTML = ''; }, 200);
+    }
+    triggered = false;
+  }, { passive: true });
+})();
 
 /* ═══════════════════════════════════════════════════════════════
    CHUNK 3 — HOME SCREEN + SETUP WIZARD
@@ -6559,6 +6664,7 @@ function renderParentSettings() {
       <div style="display:flex;gap:10px;align-items:center">
         <span style="font-size:0.9rem;color:var(--green);font-weight:600">✅ Automatic</span>
         <button class="btn btn-secondary btn-sm" onclick="goHome()">Switch User</button>
+        <button class="btn btn-secondary btn-sm" onclick="location.reload(true)">🔄 Reload App</button>
       </div>
       ${s.lastSync?`<div style="font-size:0.78rem;color:var(--muted);margin-top:8px">Last synced: ${new Date(s.lastSync).toLocaleString()}</div>`:''}
     </div>
