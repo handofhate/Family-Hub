@@ -2249,7 +2249,9 @@ function normalizeData(data) {
       }
     }
   }
-  normalized.teamGoals = Array.isArray(normalized.teamGoals) ? normalized.teamGoals : [];
+  normalized.teamGoals = Array.isArray(normalized.teamGoals)
+    ? normalized.teamGoals.map(g => ({ icon: 'trophy', iconColor: '#FFD93D', ...g }))
+    : [];
   // Migrate old combo bonus history entries that were incorrectly saved as type 'chore'
   normalized.history = (normalized.history || []).map(h =>
     h.type === 'chore' && h.title?.includes('Combo Bonus') ? { ...h, type: 'bonus' } : h
@@ -4706,7 +4708,7 @@ function renderKidTeam() {
     }).join('');
     return `
       <div class="goal-card" style="margin-bottom:14px">
-        <span class="goal-icon">${g.icon||'🏆'}</span>
+        <span class="goal-icon">${renderIcon(g.icon, g.iconColor, 'font-size:3.5rem')}</span>
         <div class="goal-title">${esc(g.title)}</div>
         <div class="goal-sub">${total} / ${target} 💎</div>
         <div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${pct}%"></div></div>
@@ -5943,7 +5945,7 @@ function renderParentPrizes() {
     const pct   = Math.min(100,Math.round(total/(g.targetPoints||1)*100));
     html += `
       <div class="admin-card">
-        <span class="admin-icon">${g.icon||'🏆'}</span>
+        <span class="admin-icon">${renderIcon(g.icon, g.iconColor, 'font-size:1.6rem')}</span>
         <div class="admin-info">
           <div class="admin-name">${esc(g.title)}</div>
           <div class="admin-meta">${total} / ${g.targetPoints} 💎 · ${pct}%</div>
@@ -6047,18 +6049,25 @@ function deletePrize(prizeId) {
 
 function showGoalModal(goalId) {
   const existing = goalId ? D.teamGoals?.find(g => g.id === goalId) : null;
-  const g = existing || { title:'', icon:'🏆', targetPoints:500 };
-  const iconOpts = ['🏆','🎯','🏰','✈️','🎪','🏖️','🎢','🎡','🏕️','⛷️','🚢','🎠','🎭','🎬','🍕','🎮'].map(ic =>
-    `<div class="icon-opt${ic===g.icon?' sel':''}" onclick="selGoalIcon(this,'${ic}')">${ic}</div>`
+  const g = existing || { title:'', icon:'trophy', iconColor:'#FFD93D', targetPoints:500 };
+  const goalColor = g.iconColor || '#FFD93D';
+  const iconOpts = ICON_MAP.slice(0, 48).map(({n}) =>
+    `<div class="icon-opt${n===g.icon?' sel':''}" onclick="selGoalIcon(this,'${n}')" data-icon="${n}"><i class="ph-duotone ph-${n}"></i></div>`
+  ).join('');
+  const colorSwatches = COLORS.map(col =>
+    `<div class="icon-color-swatch${col===goalColor?' sel':''}" style="background:${col}" onclick="selGoalColor(this,'${col}')"></div>`
   ).join('');
 
   showModal(`
     <div class="modal-title">${existing?'Edit':'Add'} Team Prize</div>
     <input type="hidden" id="gm-id" value="${goalId||''}">
-    <input type="hidden" id="gm-icon" value="${g.icon||'🏆'}">
+    <input type="hidden" id="gm-icon" value="${g.icon||'trophy'}">
+    <input type="hidden" id="gm-icon-color" value="${goalColor}">
     <div class="form-group">
-      <label class="form-label">Icon</label>
-      <div class="icon-picker" style="grid-template-columns:repeat(6,1fr)">${iconOpts}</div>
+      <label class="form-label">Icon &amp; Color</label>
+      <div class="icon-color-row">${colorSwatches}</div>
+      <input type="text" class="icon-search-input" placeholder="Search icons (e.g. trophy, trip, movie)..." oninput="filterGoalIcons(this.value)">
+      <div class="icon-picker" id="goal-icon-picker-grid" style="color:${goalColor}">${iconOpts}</div>
     </div>
     <div class="form-group">
       <label class="form-label">Prize name</label>
@@ -6080,19 +6089,43 @@ function selGoalIcon(el, icon) {
   el.classList.add('sel');
 }
 
+function selGoalColor(el, color) {
+  document.getElementById('gm-icon-color').value = color;
+  el.closest('.icon-color-row').querySelectorAll('.icon-color-swatch').forEach(x => x.classList.remove('sel'));
+  el.classList.add('sel');
+  const grid = document.getElementById('goal-icon-picker-grid');
+  if (grid) grid.style.color = color;
+}
+
+function filterGoalIcons(query) {
+  const q = query.toLowerCase().trim();
+  const cur = document.getElementById('gm-icon')?.value;
+  const grid = document.getElementById('goal-icon-picker-grid');
+  if (!grid) return;
+  const matches = q ? ICON_MAP.filter(({k}) => k.includes(q)) : ICON_MAP.slice(0, 48);
+  if (matches.length === 0) {
+    grid.innerHTML = `<div style="color:var(--muted);font-size:0.85rem;padding:8px;grid-column:1/-1">No icons found — try different words.</div>`;
+  } else {
+    grid.innerHTML = matches.map(({n}) =>
+      `<div class="icon-opt${n===cur?' sel':''}" onclick="selGoalIcon(this,'${n}')" data-icon="${n}"><i class="ph-duotone ph-${n}"></i></div>`
+    ).join('');
+  }
+}
+
 function saveGoal() {
   const goalId = document.getElementById('gm-id')?.value;
   const title  = document.getElementById('gm-title')?.value.trim();
-  const icon   = document.getElementById('gm-icon')?.value || '🏆';
+  const icon      = document.getElementById('gm-icon')?.value || 'trophy';
+  const iconColor = document.getElementById('gm-icon-color')?.value || '#FFD93D';
   const target = parseInt(document.getElementById('gm-target')?.value)||500;
   if (!title) { toast('Enter a prize name'); return; }
 
   if (!D.teamGoals) D.teamGoals = [];
   if (goalId) {
     const g = D.teamGoals.find(x => x.id === goalId);
-    if (g) Object.assign(g, { title, icon, targetPoints: target });
+    if (g) Object.assign(g, { title, icon, iconColor, targetPoints: target });
   } else {
-    D.teamGoals.push({ id: genId(), title, icon, targetPoints: target, contributions: {} });
+    D.teamGoals.push({ id: genId(), title, icon, iconColor, targetPoints: target, contributions: {} });
   }
   saveData();
   closeModal();
