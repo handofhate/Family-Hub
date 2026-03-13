@@ -752,18 +752,18 @@
     #screen-pin {
       background: var(--bg);
       align-items: center;
-      justify-content: space-evenly;
-      padding: 32px 24px;
+      justify-content: flex-start;
+      padding: 10vh 24px 6vh;
       gap: 0;
     }
-    .pin-avatar { font-size: 5.5rem; margin-bottom: 0; }
+    .pin-avatar { font-size: 5.5rem; margin-bottom: 8px; }
     .pin-title  { font-size: 2rem; font-weight: 800; margin-bottom: 6px; }
-    .pin-sub    { color: var(--muted); font-size: 1rem; margin-bottom: 0; }
+    .pin-sub    { color: var(--muted); font-size: 1rem; margin-bottom: 40px; }
     .pin-dots {
       display: flex;
       gap: 20px;
       justify-content: center;
-      margin: 0;
+      margin-bottom: 48px;
     }
     .pin-dot {
       width: 22px; height: 22px;
@@ -793,7 +793,7 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     }
     .pin-key:active { background: var(--purple); color: #fff; border-color: var(--purple); transform: scale(0.95); }
-    .pin-error { color: #EF4444; font-weight: 700; margin-top: 0; font-size: 1rem; min-height: 1.4rem; }
+    .pin-error { color: #EF4444; font-weight: 700; margin-top: 16px; font-size: 1rem; min-height: 1.4rem; }
 
     /* ══════════════════════════════════════════
        SETUP SCREEN
@@ -3826,7 +3826,6 @@ function renderKidView() {
     document.getElementById('kid-content').className = 'main-content';
   }
 
-  setupKidSwipe();
   renderKidHeader();
   renderKidNav();
   renderKidTab();
@@ -3876,36 +3875,12 @@ function renderKidNav() {
     </button>`).join('');
 }
 
-const KID_TAB_ORDER = ['chores','diamonds','shop','team','stats'];
-
 function switchKidTab(tab) {
   S.kidTab = tab;
   renderKidNav();
   renderKidTab();
 }
 
-// Set up swipe-to-switch-tab on the kid screen (called once)
-let _kidSwipeSetup = false;
-function setupKidSwipe() {
-  if (_kidSwipeSetup) return;
-  _kidSwipeSetup = true;
-  const screen = document.getElementById('screen-kid');
-  let startX = 0, startY = 0;
-  screen.addEventListener('touchstart', e => {
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-  }, { passive: true });
-  screen.addEventListener('touchend', e => {
-    const dx = e.changedTouches[0].clientX - startX;
-    const dy = e.changedTouches[0].clientY - startY;
-    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return; // not a horizontal swipe
-    const idx = KID_TAB_ORDER.indexOf(S.kidTab);
-    const next = dx < 0
-      ? KID_TAB_ORDER[Math.min(idx + 1, KID_TAB_ORDER.length - 1)]
-      : KID_TAB_ORDER[Math.max(idx - 1, 0)];
-    if (next !== S.kidTab) switchKidTab(next);
-  }, { passive: true });
-}
 
 function renderKidTab() {
   switch(S.kidTab) {
