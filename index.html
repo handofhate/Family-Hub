@@ -3558,8 +3558,17 @@ function renderCurrentView() {
 // ── PULL TO REFRESH ────────────────────────────────────────────
 (function setupPullToRefresh() {
   const indicator = document.getElementById('ptr-indicator');
-  let startY = 0, pulling = false, triggered = false;
+  let startY = 0, pulling = false, triggered = false, activeScroller = null;
+  let lastScrollTime = 0;
   const THRESHOLD = 72; // px to pull before release triggers refresh
+  const SCROLL_COOLDOWN = 400; // ms to wait after inertial scroll before arming PTR
+
+  // Track whenever a .main-content element scrolls (catches inertial scroll arrivals)
+  document.addEventListener('scroll', e => {
+    if (e.target && e.target.classList && e.target.classList.contains('main-content')) {
+      lastScrollTime = Date.now();
+    }
+  }, { passive: true, capture: true });
 
   function setIndicator(pullPx) {
     if (pullPx <= 0) {
@@ -3598,16 +3607,22 @@ function renderCurrentView() {
   }
 
   document.addEventListener('touchstart', e => {
-    // Only pull when the touched scroll container is at the very top
+    // Only pull when the scroll container is at the very top and not still coasting
     const scroller = e.target.closest('.main-content');
     if (!scroller || scroller.scrollTop > 2) return;
-    startY   = e.touches[0].clientY;
-    pulling  = true;
-    triggered = false;
+    if (Date.now() - lastScrollTime < SCROLL_COOLDOWN) return;
+    startY        = e.touches[0].clientY;
+    pulling       = true;
+    triggered     = false;
+    activeScroller = scroller;
   }, { passive: true });
 
   document.addEventListener('touchmove', e => {
     if (!pulling) return;
+    // Abort if the container has scrolled down since touchstart (e.g. inertia was still running)
+    if (activeScroller && activeScroller.scrollTop > 2) {
+      pulling = false; activeScroller = null; setIndicator(0); return;
+    }
     const dy = e.touches[0].clientY - startY;
     if (dy <= 0) { pulling = false; setIndicator(0); return; }
     setIndicator(dy);
@@ -3617,6 +3632,7 @@ function renderCurrentView() {
   document.addEventListener('touchend', () => {
     if (!pulling) return;
     pulling = false;
+    activeScroller = null;
     if (triggered) {
       doRefresh();
     } else {
