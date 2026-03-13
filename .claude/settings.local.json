@@ -10,7 +10,10 @@
       "Bash(python rename_diamonds.py)",
       "Bash(python -c \":*)",
       "Bash(python check.py)",
-      "Bash(rm check.py)"
+      "Bash(rm check.py)",
+      "WebFetch(domain:unpkg.com)",
+      "Bash(curl -s \"https://unpkg.com/@phosphor-icons/web@2.1.1/src/duotone/style.css\")",
+      "Read(//tmp/**)"
     ]
   }
 }
