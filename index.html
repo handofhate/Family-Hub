@@ -1710,7 +1710,7 @@ function showAppPin() {
       `).join('')}
     </div>
     <div id="pin-error" class="pin-error hidden"></div>
-    ${getBiometricCredentialId() ? `<button class="btn btn-secondary mt-16" style="width:min(360px,calc(100vw - 48px))" onclick="tryBiometricUnlock()">🔒 Use Face ID</button>` : ''}`;
+    ${getBiometricCredentialId() ? `<button class="btn btn-secondary mt-16" style="width:min(360px,calc(100vw - 48px))" onclick="tryBiometricUnlock()"><i class="ph-duotone ph-fingerprint" style="font-size:1rem;vertical-align:middle"></i> Use Face ID</button>` : ''}`;
   // Auto-trigger Face ID once — cancel any previously queued trigger first
   clearTimeout(S._biometricTimer);
   if (getBiometricCredentialId()) {
@@ -1934,7 +1934,7 @@ function checkForApprovalCelebration(prevPendingKeys, member) {
   });
   // Soft notification when a before-photo gets the green light (no diamonds yet)
   if (anyBeforeApproved && totalNewDiamonds === 0) {
-    toast("🟢 Parent approved — time to do the chore!");
+    toast("Parent approved — time to do the chore!");
     renderKidChores();
     return;
   }
@@ -1948,7 +1948,7 @@ function checkForApprovalCelebration(prevPendingKeys, member) {
     : `${approvedChores.length} chores approved!`;
   showCelebration({
     icon:   approvedChores[0]?.icon || '💎',
-    title:  tiny ? '🎉 Your parent said YES!' : '✅ Chore Approved!',
+    title:  tiny ? '<i class="ph-duotone ph-confetti" style="color:#F97316"></i> Your parent said YES!' : '<i class="ph-duotone ph-check-circle" style="color:#16A34A"></i> Chore Approved!',
     sub:    subLine,
     diamonds: totalNewDiamonds,
     tts:    tiny ? `Amazing! Your parent approved your chore! You earned ${totalNewDiamonds} diamonds!` : null,
@@ -2842,11 +2842,11 @@ function showSplitHouseholdModal(memberId) {
       <div class="sh-override-row" id="sh-ov-${date}">
         <span class="sh-override-label">${date}</span>
         <span class="sh-badge ${isHere ? 'here' : 'away'}">${isHere ? 'Here' : 'Away'}</span>
-        <button class="btn-icon-sm" onclick="removeShOverride('${date}')">✕</button>
+        <button class="btn-icon-sm" onclick="removeShOverride('${date}')"><i class="ph-duotone ph-x" style="font-size:0.9rem"></i></button>
       </div>`).join('');
 
   showModal(`
-    <div class="modal-title">🏠 Split Household — ${esc(member.name)}</div>
+    <div class="modal-title"><i class="ph-duotone ph-house" style="color:#6C63FF;font-size:1.2rem;vertical-align:middle"></i> Split Household — ${esc(member.name)}</div>
 
     <div class="toggle-row" style="margin-bottom:16px">
       <div>
@@ -2957,7 +2957,7 @@ function addShOverride() {
       <div class="sh-override-row" id="sh-ov-${d}">
         <span class="sh-override-label">${d}</span>
         <span class="sh-badge ${isHere ? 'here' : 'away'}">${isHere ? 'Here' : 'Away'}</span>
-        <button class="btn-icon-sm" onclick="removeShOverride('${d}')">✕</button>
+        <button class="btn-icon-sm" onclick="removeShOverride('${d}')"><i class="ph-duotone ph-x" style="font-size:0.9rem"></i></button>
       </div>`).join('') || '<div style="color:var(--text-muted);font-size:0.82rem">No exceptions yet</div>';
 }
 
@@ -2993,13 +2993,13 @@ function showHereCheckModal(members) {
       <span style="font-size:1.8rem">${m.avatar}</span>
       <span style="font-weight:600;flex:1">${esc(m.name)}</span>
       <div class="here-check-btns">
-        <button class="btn btn-sm" style="background:var(--green);color:#fff" onclick="markHereToday('${m.id}')">Here ✓</button>
+        <button class="btn btn-sm" style="background:var(--green);color:#fff" onclick="markHereToday('${m.id}')">Here <i class="ph-duotone ph-check" style="font-size:0.9rem;vertical-align:middle"></i></button>
         <button class="btn btn-secondary btn-sm" onclick="markAwayToday('${m.id}')">Away</button>
       </div>
     </div>`).join('');
 
   showModal(`
-    <div class="modal-title">🏠 Are they home?</div>
+    <div class="modal-title"><i class="ph-duotone ph-house" style="color:#6C63FF;font-size:1.2rem;vertical-align:middle"></i> Are they home?</div>
     <p style="color:var(--text-muted);font-size:0.88rem;margin-bottom:12px">
       It's past 6 pm and these kids haven't done any chores today. Are they actually at your house?
     </p>
@@ -3052,8 +3052,8 @@ function checkAfterDiamondsAwarded(member, dmds) {
       member.diamonds      = (member.diamonds      || 0) + streakBonus;
       member.totalEarned = (member.totalEarned || 0) + streakBonus;
       member.xp          = (member.xp          || 0) + streakBonus;
-      addHistory('chore', member.id, `🔥 Streak bonus (${member.streak.current} days)`, streakBonus);
-      toast(`🔥 ${member.streak.current}-day streak! +${streakBonus} bonus 💎`);
+      addHistory('chore', member.id, `Streak bonus (${member.streak.current} days)`, streakBonus);
+      toast(`<i class="ph-duotone ph-fire" style="color:#F97316;font-size:1rem;vertical-align:middle"></i> ${member.streak.current}-day streak! +${streakBonus} bonus 💎`);
     }
   }
 
@@ -3146,7 +3146,7 @@ function checkComboBonus(memberId) {
   member.diamonds      = (member.diamonds      || 0) + bonusPts;
   member.totalEarned = (member.totalEarned || 0) + bonusPts;
   if (D.settings.levelingEnabled !== false) member.xp = (member.xp || 0) + bonusPts;
-  addHistory('bonus', memberId, '⚡ Daily Combo Bonus!', bonusPts);
+  addHistory('bonus', memberId, 'Daily Combo Bonus!', bonusPts);
 
   // Update combo streak
   normalizeMember(member);
@@ -3163,8 +3163,8 @@ function checkComboBonus(memberId) {
   // Trigger big celebration
   setTimeout(() => {
     launchConfetti(120);
-    const streakMsg = cs.current > 1 ? ` 🔥 ${cs.current} day combo streak!` : '';
-    toast(`⚡ COMBO COMPLETE! +${bonusPts} bonus 💎!${streakMsg}`);
+    const streakMsg = cs.current > 1 ? ` <i class="ph-duotone ph-fire" style="color:#F97316;font-size:0.9rem;vertical-align:middle"></i> ${cs.current} day combo streak!` : '';
+    toast(`<i class="ph-duotone ph-lightning" style="color:#F59E0B;font-size:1rem;vertical-align:middle"></i> COMBO COMPLETE! +${bonusPts} bonus 💎!${streakMsg}`);
   }, 300);
 }
 
@@ -3193,7 +3193,7 @@ function _renderNL() {
   const secs = String(totalSecs % 60).padStart(2,'0');
 
   document.getElementById('nl-root').innerHTML = `
-    <div class="nl-title">🔇 You're Not Listening</div>
+    <div class="nl-title"><i class="ph-duotone ph-speaker-slash" style="font-size:1.1rem;vertical-align:middle"></i> You're Not Listening</div>
     <div class="nl-timer" id="nl-timer">${mins}:${secs}</div>
     <div class="nl-dmds-lost" id="nl-dmds">${st.diamondsLost > 0 ? `−${st.diamondsLost} 💎 so far` : 'Hold the button to deduct diamonds'}</div>
     <div class="nl-kids">
@@ -3338,13 +3338,13 @@ function _nlDone() {
       m.nlLifetimeSecs = (m.nlLifetimeSecs || 0) + sessionSecs;
       if (dmds > 0) {
         m.diamonds = Math.max(0, (m.diamonds || 0) - dmds);
-        addHistory('penalty', kidId, `🔇 Not listening penalty`, -dmds);
+        addHistory('penalty', kidId, `Not listening penalty`, -dmds);
       }
     });
     saveData();
     if (dmds > 0) {
       const names = _nlState.selectedKids.map(id => getMember(id)?.name).filter(Boolean).join(' & ');
-      toast(`🔇 Deducted ${dmds} 💎 from ${names}`);
+      toast(`Deducted ${dmds} 💎 from ${names}`);
     }
     renderParentHome();
     renderParentHeader();
@@ -3444,7 +3444,7 @@ function showCelebration({ icon='💎', title='Great job!', sub='', diamonds=nul
         <div class="cel-title">${title}</div>
         ${sub ? `<div class="cel-sub">${sub}</div>` : ''}
         ${ptsHtml}
-        <button class="btn btn-primary btn-full" onclick="closeCelebration()">Yay! 🎉</button>
+        <button class="btn btn-primary btn-full" onclick="closeCelebration()">Yay! <i class="ph-duotone ph-confetti" style="font-size:1rem;vertical-align:middle"></i></button>
       </div>
     </div>`;
 
@@ -3485,7 +3485,7 @@ function closeModalIfBg(e) {
 function openUserSettings() {
   const name = S.currentUser?.name || 'User';
   showModal(`
-    <div class="modal-title">⚙️ Settings</div>
+    <div class="modal-title"><i class="ph-duotone ph-gear-six" style="color:#6C63FF;font-size:1.2rem;vertical-align:middle"></i> Settings</div>
     <p style="color:var(--muted);font-size:0.95rem;margin-bottom:16px">
       Signed in as <strong>${esc(name)}</strong>.
     </p>
@@ -3510,7 +3510,7 @@ function updateSyncBar() {
   ['kid-sync-bar','parent-sync-bar'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
-    if (S.syncStatus==='error') { el.className='sync-bar error'; el.textContent='⚠️ Sync failed — check connection'; }
+    if (S.syncStatus==='error') { el.className='sync-bar error'; el.textContent='Sync failed — check connection'; }
     else { el.innerHTML=''; el.className=''; }
   });
 }
@@ -3613,8 +3613,8 @@ function renderHome() {
                     : mode === 'elder'    ? 'Elder'
                     : mode === 'tiny'     ? 'Little Kid'
                     : 'Kid';
-    const ptsLabel = m.role === 'parent' ? '⚙️ Admin'
-                   : mode === 'elder'    ? '👁️ View'
+    const ptsLabel = m.role === 'parent' ? '<i class="ph-duotone ph-gear-six" style="color:#fff;font-size:0.9rem;vertical-align:middle"></i> Admin'
+                   : mode === 'elder'    ? '<i class="ph-duotone ph-eye" style="color:#fff;font-size:0.9rem;vertical-align:middle"></i> View'
                    : `💎 ${m.diamonds||0} 💎`;
     return `
       <button class="profile-card${bday?' bday-card':''}" style="--member-color:${m.color||'#6C63FF'};position:relative"
@@ -3628,7 +3628,7 @@ function renderHome() {
   }).join('');
   const anyBday = members.some(m => m.role !== 'parent' && isBirthday(m));
   const bdayBanner = anyBday
-    ? `<div class="bday-banner">🎂 It's a birthday today! 🎉</div>` : '';
+    ? `<div class="bday-banner"><i class="ph-duotone ph-cake" style="font-size:1rem;vertical-align:middle"></i> It's a birthday today! <i class="ph-duotone ph-confetti" style="font-size:1rem;vertical-align:middle"></i></div>` : '';
 
   document.getElementById('home-content').innerHTML = `
     <div class="screen active" id="screen-home" style="background:linear-gradient(145deg,#667eea,#764ba2);align-items:center;justify-content:center;padding:24px;min-height:100vh;display:flex;flex-direction:column">
@@ -3636,7 +3636,7 @@ function renderHome() {
       <div class="home-title">Family Hub</div>
       <div class="home-family-name">${esc(D.family.name)}</div>
       <div class="profile-grid">${cards}</div>
-      <button class="home-setup-btn" onclick="goSetup()">⚙️ Edit Family</button>
+      <button class="home-setup-btn" onclick="goSetup()"><i class="ph-duotone ph-gear-six" style="color:#6C63FF;font-size:1.1rem;vertical-align:middle"></i> Edit Family</button>
     </div>`;
 
   // Inline — since we're modifying a child of the screen, re-render properly:
@@ -3647,7 +3647,7 @@ function renderHome() {
     <div class="home-title">Family Hub</div>
     <div class="home-family-name">${esc(D.family.name)}</div>
     <div class="profile-grid" style="max-width:980px;width:100%;padding:0 24px">${cards}</div>
-    <button class="home-setup-btn mt-12" onclick="goSetup()">⚙️ Edit Family</button>
+    <button class="home-setup-btn mt-12" onclick="goSetup()"><i class="ph-duotone ph-gear-six" style="color:#6C63FF;font-size:1.1rem;vertical-align:middle"></i> Edit Family</button>
     <div style="height:24px"></div>`;
 }
 
@@ -3663,7 +3663,7 @@ function selectProfile(id) {
     showCelebration({
       icon:  '🎂',
       title: `Happy Birthday, ${member.name}!`,
-      sub:   '🎉 Have an amazing day! 🎉',
+      sub:   '<i class="ph-duotone ph-confetti" style="color:#F97316"></i> Have an amazing day! <i class="ph-duotone ph-confetti" style="color:#F97316"></i>',
       tts:   `Happy Birthday ${member.name}! Wishing you the most wonderful day!`,
       onClose: () => routeToView(member),
     });
@@ -3862,7 +3862,7 @@ function renderSetupStep() {
 
     case 'welcome': content = `
       <div class="setup-top">
-        <div class="setup-emoji">🏠</div>
+        <div class="setup-emoji"><i class="ph-duotone ph-house" style="color:#6C63FF;font-size:3rem"></i></div>
         <div class="setup-title">${D.setup ? 'Edit Family' : 'Welcome!'}</div>
         <div class="setup-sub">${D.setup ? 'Update your family settings.' : "Let's set up your Family Hub in just a few steps."}</div>
       </div>
@@ -3875,7 +3875,7 @@ function renderSetupStep() {
 
     case 'members': content = `
       <div class="setup-top" style="padding-top:20px">
-        <div class="setup-emoji">👨‍👩‍👧‍👦</div>
+        <div class="setup-emoji"><i class="ph-duotone ph-users-three" style="color:#6C63FF;font-size:3rem"></i></div>
         <div class="setup-title">Family Members</div>
         <div class="setup-sub">Add anyone who will use the app — kids, elders, anyone!</div>
       </div>
@@ -3889,7 +3889,7 @@ function renderSetupStep() {
 
     case 'chores': content = `
       <div class="setup-top" style="padding-top:20px">
-        <div class="setup-emoji">📋</div>
+        <div class="setup-emoji"><i class="ph-duotone ph-clipboard-text" style="color:#6C63FF;font-size:3rem"></i></div>
         <div class="setup-title">Starter Chores</div>
         <div class="setup-sub">Pick some to add. You can edit everything later.</div>
       </div>
@@ -3910,7 +3910,7 @@ function renderSetupStep() {
 
     case 'prizes': content = `
       <div class="setup-top" style="padding-top:20px">
-        <div class="setup-emoji">🎁</div>
+        <div class="setup-emoji"><i class="ph-duotone ph-gift" style="color:#FF6584;font-size:3rem"></i></div>
         <div class="setup-title">Prize Shop</div>
         <div class="setup-sub">Choose prizes kids can earn. Add your own later!</div>
       </div>
@@ -3931,12 +3931,12 @@ function renderSetupStep() {
 
     case 'sync': content = `
       <div class="setup-top" style="padding-top:20px">
-        <div class="setup-emoji">☁️</div>
+        <div class="setup-emoji"><i class="ph-duotone ph-cloud" style="color:#10B981;font-size:3rem"></i></div>
         <div class="setup-title">Family Sync</div>
         <div class="setup-sub">All devices sync automatically — nothing to configure!</div>
       </div>
       <div class="card" style="background:#F0FDF4;border:2px solid var(--green);margin-bottom:14px">
-        <div class="card-title">✅ Sync is enabled</div>
+        <div class="card-title"><i class="ph-duotone ph-check-circle" style="color:#16A34A;font-size:1rem;vertical-align:middle"></i> Sync is enabled</div>
         <p style="font-size:0.88rem;line-height:1.6;color:var(--muted)">
           Family Hub uses Google Firestore to keep all devices in sync in real time.
           Any change made on one device will appear on all others instantly.
@@ -3958,13 +3958,13 @@ function renderSetupStep() {
       </div>
       <div class="flex gap-10 mt-8">
         <button class="btn btn-secondary" style="flex:0 0 80px" onclick="setupBack()">← Back</button>
-        <button class="btn btn-primary" style="flex:1" onclick="setupNext()">Finish! 🎉</button>
+        <button class="btn btn-primary" style="flex:1" onclick="setupNext()">Finish! <i class="ph-duotone ph-confetti" style="font-size:0.95rem;vertical-align:middle"></i></button>
       </div>`;
       break;
 
     case 'done': content = `
       <div style="text-align:center;padding:40px 20px">
-        <div style="font-size:5rem">🎉</div>
+        <div style="font-size:5rem"><i class="ph-duotone ph-confetti" style="color:#F97316"></i></div>
         <div class="setup-title mt-12">You're all set!</div>
         <div class="setup-sub mt-8" style="margin-bottom:28px">Your Family Hub is ready. Have fun!</div>
         <button class="btn btn-primary btn-full" onclick="finishSetup()">Let's go! →</button>
@@ -3989,9 +3989,9 @@ function memberSetupCard(mem, i) {
 
   const dm = mem.displayMode || 'regular';
   const modes = [
-    { id:'tiny',    icon:'🐣', label:'Little Kid',  sub:'Big icons + voice' },
-    { id:'regular', icon:'🧒', label:'Big Kid',     sub:'Standard view' },
-    { id:'elder',   icon:'👵', label:'Elder',       sub:'Large text, simple' },
+    { id:'tiny',    icon:'<i class="ph-duotone ph-star" style="color:#F97316;font-size:1.1rem"></i>', label:'Little Kid',  sub:'Big icons + voice' },
+    { id:'regular', icon:'<i class="ph-duotone ph-user" style="color:#6C63FF;font-size:1.1rem"></i>', label:'Big Kid',     sub:'Standard view' },
+    { id:'elder',   icon:'<i class="ph-duotone ph-users" style="color:#0F766E;font-size:1.1rem"></i>', label:'Elder',       sub:'Large text, simple' },
   ];
   const modeOpts = modes.map(m =>
     `<div class="mode-opt${dm===m.id?' sel':''}" onclick="setMemberField(${i},'displayMode','${m.id}',true)">
@@ -4015,7 +4015,7 @@ function memberSetupCard(mem, i) {
     <div class="kid-setup-card" id="member-card-${i}">
       <div class="kid-setup-card-header">
         <span style="font-size:1.5rem;font-weight:700">${mem.avatar||'🙂'} Member ${i+1}</span>
-        <button class="btn-icon-sm btn-icon-delete" onclick="removeMemberCard(${i})">✕</button>
+        <button class="btn-icon-sm btn-icon-delete" onclick="removeMemberCard(${i})"><i class="ph-duotone ph-x" style="font-size:0.9rem"></i></button>
       </div>
       <div class="input-row">
         <div class="form-group mb-0">
@@ -4028,7 +4028,7 @@ function memberSetupCard(mem, i) {
         </div>
       </div>
       <div class="form-group mt-8">
-        <label class="form-label">🎂 Birthday <span class="form-label-hint">for surprise animations!</span></label>
+        <label class="form-label"><i class="ph-duotone ph-cake" style="color:#F97316;font-size:1rem;vertical-align:middle"></i> Birthday <span class="form-label-hint">for surprise animations!</span></label>
         <div class="input-row">${monthSel}${daySel}</div>
       </div>
       <div class="form-group">
@@ -4220,8 +4220,8 @@ function renderKidHeader() {
         <div class="header-name">Hi, ${esc(m.name)}!</div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:3px">
           ${showLevel       ? `<span class="header-level-badge">${lvl.icon} ${lvl.name}</span>` : ''}
-          ${showStreak      ? `<span class="header-streak-badge">🔥 ${streak}d streak</span>` : ''}
-          ${showComboStreak ? `<span class="header-streak-badge" style="background:#FEF3C7;border-color:#F59E0B;color:#92400E">⚡ ${comboStreak}d combos</span>` : ''}
+          ${showStreak      ? `<span class="header-streak-badge"><i class="ph-duotone ph-fire" style="color:#F97316;font-size:0.85rem;vertical-align:middle"></i> ${streak}d streak</span>` : ''}
+          ${showComboStreak ? `<span class="header-streak-badge" style="background:#FEF3C7;border-color:#F59E0B;color:#92400E"><i class="ph-duotone ph-lightning" style="color:#F59E0B;font-size:0.85rem;vertical-align:middle"></i> ${comboStreak}d combos</span>` : ''}
           ${!showLevel && !showStreak && !showComboStreak ? `<div class="header-sub">${todayDisplay()}</div>` : ''}
         </div>
       </div>
@@ -4271,7 +4271,7 @@ function renderKidChores() {
   if (myChores.length === 0) {
     document.getElementById('kid-content').innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">🎉</div>
+        <div class="empty-icon"><i class="ph-duotone ph-confetti" style="color:#F97316;font-size:3rem"></i></div>
         <div class="empty-text">No chores assigned yet! Ask a parent.</div>
       </div>`;
     return;
@@ -4303,7 +4303,7 @@ function renderKidChores() {
           <div style="font-size:1.6rem;font-weight:800">${doneUnits} / ${totalUnits || myChores.length}</div>
           <div style="opacity:0.85;font-size:0.85rem">completions finished right now</div>
         </div>
-        <div style="font-size:${isTiny(m)?'3rem':'2rem'}">${pct===100?'🏆':m.avatar||'💎'}</div>
+        <div style="font-size:${isTiny(m)?'3rem':'2rem'}">${pct===100?'<i class="ph-duotone ph-trophy" style="color:#FFD93D"></i>':m.avatar||'💎'}</div>
       </div>
       <div style="background:rgba(255,255,255,0.3);border-radius:999px;height:10px;overflow:hidden">
         <div style="width:${pct}%;height:100%;border-radius:999px;background:#FFD93D;transition:width 0.5s"></div>
@@ -4318,7 +4318,7 @@ function renderKidChores() {
       <div class="combo-banner">
         <div class="combo-banner-header">
           <div>
-            <div class="combo-banner-title"><i class="combo-sparkle">⚡</i> Daily Combo ${comboBonusAlreadyAwarded ? '— Complete! 🎉' : ''}</div>
+            <div class="combo-banner-title"><i class="ph-duotone ph-lightning" style="color:#F59E0B;font-size:1rem;vertical-align:middle"></i> Daily Combo ${comboBonusAlreadyAwarded ? '— Complete! <i class="ph-duotone ph-confetti" style="font-size:0.95rem;vertical-align:middle"></i>' : ''}</div>
             <div class="combo-banner-sub">${comboBonusAlreadyAwarded
               ? `You earned +${bonusPts} bonus 💎 today!`
               : `Complete all 3 for +${bonusPts} bonus 💎 (2× those chores!)`}</div>
@@ -4329,7 +4329,7 @@ function renderKidChores() {
           ${comboChores.map(c => {
             const isDone = progressMap.get(c.id)?.status === 'done';
             return `<div class="combo-chore-item ${isDone ? 'done' : ''}">
-              <span class="combo-chore-item-check">${isDone ? '✅' : '⬜'}</span>
+              <span class="combo-chore-item-check">${isDone ? '<i class="ph-duotone ph-check-circle" style="color:#16A34A;font-size:1.1rem"></i>' : '<i class="ph-duotone ph-circle" style="color:#D1D5DB;font-size:1.1rem"></i>'}</span>
               <span>${renderIcon(c.icon, c.iconColor, 'font-size:1rem;vertical-align:middle')} ${esc(c.title)}</span>
               <span style="margin-left:auto;font-size:0.75rem;opacity:0.7">+${c.diamonds}×2</span>
             </div>`;
@@ -4340,7 +4340,7 @@ function renderKidChores() {
 
   // Todo chores
   if (todo.length > 0) {
-    html += `<div class="card-title">📋 To Do</div>`;
+    html += `<div class="card-title"><i class="ph-duotone ph-clipboard-text" style="color:#9CA3AF;font-size:1rem;vertical-align:middle"></i> To Do</div>`;
     html += `<div id="sort-todo">`;
     todo.forEach(c => { html += normalChoreCard(c, m, progressMap.get(c.id), comboIds); });
     html += `</div>`;
@@ -4352,7 +4352,7 @@ function renderKidChores() {
       const p = progressMap.get(c.id);
       const done_ = p?.doneCount || 0;
       const total_ = p?.targetCount || p?.slotStatuses?.length || '?';
-      html += `<div class="card-title mt-12">✨ ${done_} of ${total_} Done</div>`;
+      html += `<div class="card-title mt-12"><i class="ph-duotone ph-sparkle" style="color:#6C63FF;font-size:1rem;vertical-align:middle"></i> ${done_} of ${total_} Done</div>`;
       html += `<div>`;
       html += normalChoreCard(c, m, p, comboIds);
       html += `</div>`;
@@ -4361,7 +4361,7 @@ function renderKidChores() {
 
   // Awaiting parent approval
   if (awaiting.length > 0) {
-    html += `<div class="card-title mt-12">⏳ Waiting for Approval</div>`;
+    html += `<div class="card-title mt-12"><i class="ph-duotone ph-hourglass" style="color:#3B82F6;font-size:1rem;vertical-align:middle"></i> Waiting for Approval</div>`;
     html += `<div id="sort-pending">`;
     awaiting.forEach(c => { html += normalChoreCard(c, m, progressMap.get(c.id), comboIds); });
     html += `</div>`;
@@ -4369,14 +4369,14 @@ function renderKidChores() {
 
   // Done
   if (done.length > 0) {
-    html += `<div class="card-title mt-12">✅ Done Today</div>`;
+    html += `<div class="card-title mt-12"><i class="ph-duotone ph-check-circle" style="color:#16A34A;font-size:1rem;vertical-align:middle"></i> Done Today</div>`;
     html += `<div id="sort-done">`;
     done.forEach(c => { html += normalChoreCard(c, m, progressMap.get(c.id), comboIds); });
     html += `</div>`;
   }
 
   if (unavailable.length > 0) {
-    html += `<div class="card-title mt-12">🕒 Later</div>`;
+    html += `<div class="card-title mt-12"><i class="ph-duotone ph-clock" style="color:#9CA3AF;font-size:1rem;vertical-align:middle"></i> Later</div>`;
     html += `<div id="sort-unavail">`;
     unavailable.forEach(c => { html += normalChoreCard(c, m, progressMap.get(c.id), comboIds); });
     html += `</div>`;
@@ -4399,14 +4399,14 @@ function normalChoreCard(chore, member, progress, comboIds = null) {
     const slotsHtml = (progress.slotStatuses || []).map(({slot, status: ss}) => {
       const label = slot.label || formatTimeWindow({start:slot.start, end:slot.end});
       let slotBtn;
-      if (ss === 'done')    slotBtn = `<span class="slot-status slot-done">✅</span>`;
-      else if (ss === 'pending') slotBtn = `<span class="slot-status slot-pending">⏳</span>`;
+      if (ss === 'done')    slotBtn = `<span class="slot-status slot-done"><i class="ph-duotone ph-check-circle" style="color:#16A34A;font-size:1rem"></i></span>`;
+      else if (ss === 'pending') slotBtn = `<span class="slot-status slot-pending"><i class="ph-duotone ph-hourglass" style="color:#3B82F6;font-size:1rem"></i></span>`;
       else if (ss === 'available') {
-        const btnLabel = chore.requiresPhoto ? '📷 Photo' : 'Done ✓';
+        const btnLabel = chore.requiresPhoto ? '<i class="ph-duotone ph-camera" style="font-size:0.9rem;vertical-align:middle"></i> Photo' : 'Done <i class="ph-duotone ph-check" style="font-size:0.9rem;vertical-align:middle"></i>';
         slotBtn = `<button class="chore-btn chore-btn-do" onclick="kidCompleteChore('${chore.id}',event,'${slot.id}')">${btnLabel}</button>`;
       } else {
         const timeHint = slot.start ? formatTimeWindow({start:slot.start, end:slot.end}) : '';
-        slotBtn = `<span class="slot-status slot-waiting" title="${timeHint}">🕒</span>`;
+        slotBtn = `<span class="slot-status slot-waiting" title="${timeHint}"><i class="ph-duotone ph-clock" style="color:#9CA3AF;font-size:1rem"></i></span>`;
       }
       return `<div class="chore-slot-row"><span class="chore-slot-label">${esc(label)}</span>${slotBtn}</div>`;
     }).join('');
@@ -4432,13 +4432,13 @@ function normalChoreCard(chore, member, progress, comboIds = null) {
   const target = progress?.targetCount || (status === 'done' ? progress?.doneCount || 1 : 0);
   let btnHtml = '';
   if (progress?.canSubmit) {
-    btnHtml = `<button class="chore-btn chore-btn-do" onclick="kidCompleteChore('${chore.id}',event)">${submitted > 0 ? 'Add one more ✓' : 'Done! ✓'}</button>`;
+    btnHtml = `<button class="chore-btn chore-btn-do" onclick="kidCompleteChore('${chore.id}',event)">${submitted > 0 ? 'Add one more <i class="ph-duotone ph-check" style="font-size:0.95rem;vertical-align:middle"></i>' : 'Done! <i class="ph-duotone ph-check" style="font-size:0.95rem;vertical-align:middle"></i>'}</button>`;
   } else if (status==='pending' || status==='partial') {
-    btnHtml = `<span class="chore-btn chore-btn-pending">⏳ Pending</span>`;
+    btnHtml = `<span class="chore-btn chore-btn-pending"><i class="ph-duotone ph-hourglass" style="font-size:0.9rem;vertical-align:middle"></i> Pending</span>`;
   } else if (status==='unavailable') {
-    btnHtml = `<span class="chore-btn chore-btn-pending">🕒 Later</span>`;
+    btnHtml = `<span class="chore-btn chore-btn-pending"><i class="ph-duotone ph-clock" style="font-size:0.9rem;vertical-align:middle"></i> Later</span>`;
   } else {
-    btnHtml = `<span class="chore-btn chore-btn-done">✅ Done</span>`;
+    btnHtml = `<span class="chore-btn chore-btn-done"><i class="ph-duotone ph-check-circle" style="color:#16A34A;font-size:0.9rem;vertical-align:middle"></i> Done</span>`;
   }
   return `
     <div class="chore-item ${status}${comboClass}"${ttsAttr}>
@@ -4466,23 +4466,23 @@ function normalChoreCardPhoto(chore, member, progress, photoPhase, comboIds = nu
 
   if (phase === 'needs_before') {
     statusClass = 'none';
-    hintHtml = `<div class="chore-meta" style="color:var(--purple)">📷 Take a "before" photo to request this chore</div>`;
-    btnHtml  = `<button class="chore-btn chore-btn-do" onclick="kidCompleteChore('${chore.id}',event,null,'before')">📷 Request</button>`;
+    hintHtml = `<div class="chore-meta" style="color:var(--purple)"><i class="ph-duotone ph-camera" style="font-size:0.9rem;vertical-align:middle"></i> Take a "before" photo to request this chore</div>`;
+    btnHtml  = `<button class="chore-btn chore-btn-do" onclick="kidCompleteChore('${chore.id}',event,null,'before')"><i class="ph-duotone ph-camera" style="font-size:1rem;vertical-align:middle"></i> Request</button>`;
   } else if (phase === 'before_pending') {
     statusClass = 'pending';
-    hintHtml = `<div class="chore-meta" style="color:var(--yellow)">⏳ Waiting for parent to approve the start</div>`;
-    btnHtml  = `<span class="chore-btn chore-btn-pending">⏳ Awaiting OK</span>`;
+    hintHtml = `<div class="chore-meta" style="color:var(--yellow)"><i class="ph-duotone ph-hourglass" style="font-size:0.9rem;vertical-align:middle"></i> Waiting for parent to approve the start</div>`;
+    btnHtml  = `<span class="chore-btn chore-btn-pending"><i class="ph-duotone ph-hourglass" style="font-size:0.9rem;vertical-align:middle"></i> Awaiting OK</span>`;
   } else if (phase === 'needs_after') {
     statusClass = 'partial';
-    hintHtml = `<div class="chore-meta" style="color:var(--green)">🟢 Approved! Do the chore, then submit your done photo.</div>`;
-    btnHtml  = `<button class="chore-btn chore-btn-do" onclick="kidCompleteChore('${chore.id}',event,null,'after')">📷 Done</button>`;
+    hintHtml = `<div class="chore-meta" style="color:var(--green)"><i class="ph-duotone ph-check-circle" style="color:var(--green);font-size:0.9rem;vertical-align:middle"></i> Approved! Do the chore, then submit your done photo.</div>`;
+    btnHtml  = `<button class="chore-btn chore-btn-do" onclick="kidCompleteChore('${chore.id}',event,null,'after')"><i class="ph-duotone ph-camera" style="font-size:1rem;vertical-align:middle"></i> Done</button>`;
   } else if (phase === 'after_pending') {
     statusClass = 'pending';
-    hintHtml = `<div class="chore-meta" style="color:var(--yellow)">⏳ Waiting for parent to approve completion</div>`;
-    btnHtml  = `<span class="chore-btn chore-btn-pending">⏳ Pending</span>`;
+    hintHtml = `<div class="chore-meta" style="color:var(--yellow)"><i class="ph-duotone ph-hourglass" style="font-size:0.9rem;vertical-align:middle"></i> Waiting for parent to approve completion</div>`;
+    btnHtml  = `<span class="chore-btn chore-btn-pending"><i class="ph-duotone ph-hourglass" style="font-size:0.9rem;vertical-align:middle"></i> Pending</span>`;
   } else {
     statusClass = 'done';
-    btnHtml = `<span class="chore-btn chore-btn-done">✅ Done</span>`;
+    btnHtml = `<span class="chore-btn chore-btn-done"><i class="ph-duotone ph-check-circle" style="color:#16A34A;font-size:0.9rem;vertical-align:middle"></i> Done</span>`;
   }
 
   return `
@@ -4538,7 +4538,7 @@ function choreCompleteReact(chore, m, result, evt) {
     if (tiny) {
       showCelebration({
         icon: chore?.icon||'💎',
-        title: 'Amazing job! 🎉',
+        title: 'Amazing job! <i class="ph-duotone ph-confetti" style="color:#F97316"></i>',
         sub:   esc(chore?.title||'Chore'),
         diamonds: chore?.diamonds||0,
         tts: `Wow! You finished ${chore?.title}! You earned ${chore?.diamonds} diamonds! You are amazing!`,
@@ -4560,7 +4560,7 @@ function choreCompleteReact(chore, m, result, evt) {
 function showPhotoCapture(choreId, slotId, entryType) {
   const chore = D.chores.find(c => c.id === choreId);
   const isBefore = entryType === 'before';
-  const titleText  = isBefore ? '📷 Take a "Before" Photo'   : '📷 Take a "Done" Photo';
+  const titleText  = isBefore ? '<i class="ph-duotone ph-camera" style="color:#6C63FF;font-size:1.1rem;vertical-align:middle"></i> Take a "Before" Photo' : '<i class="ph-duotone ph-camera" style="color:#6C63FF;font-size:1.1rem;vertical-align:middle"></i> Take a "Done" Photo';
   const hintText   = isBefore
     ? `Show the current state of "${esc(chore?.title||'')}" — e.g. the messy room, the full trash can. Parent will approve before you start.`
     : `Show that you've completed "${esc(chore?.title||'')}"`;
@@ -4572,7 +4572,7 @@ function showPhotoCapture(choreId, slotId, entryType) {
     <div class="photo-preview-wrap" id="photo-drop-zone" onclick="document.getElementById('photo-file-input').click()">
       <img id="photo-preview-img" src="" alt="" style="display:none">
       <div id="photo-drop-hint" style="color:var(--muted);font-size:2rem;padding:20px 0">
-        📷<br><span style="font-size:0.95rem">Tap to take photo or choose image</span>
+        <i class="ph-duotone ph-camera" style="color:#9CA3AF;font-size:2.5rem"></i><br><span style="font-size:0.95rem">Tap to take photo or choose image</span>
       </div>
     </div>
     <input type="file" id="photo-file-input" accept="image/*" capture="environment" style="display:none" onchange="previewChorePhoto(event)">
@@ -4613,7 +4613,7 @@ async function submitChorePhoto(choreId, slotId, entryType) {
     if (!result) return;
     if (result.error) { toast(result.error); return; }
     if (result.isBefore) {
-      toast('📷 Before photo sent! Waiting for parent to approve the start ⏳');
+      toast('<i class="ph-duotone ph-camera" style="font-size:1rem;vertical-align:middle"></i> Before photo sent! Waiting for parent to approve the start ⏳');
       if (isTiny(m)) speak('Photo sent! Waiting for Mom or Dad to say yes!');
       renderKidChores(); renderKidHeader(); renderKidNav();
       return;
@@ -4658,7 +4658,7 @@ function compressImage(file, maxPx, quality) {
 
 function viewPhoto(url) {
   showModal(`
-    <div class="modal-title">📷 Chore Photo</div>
+    <div class="modal-title"><i class="ph-duotone ph-camera" style="color:#6C63FF;font-size:1.1rem;vertical-align:middle"></i> Chore Photo</div>
     <img src="${url}" alt="Chore photo" style="width:100%;border-radius:12px;margin-bottom:16px;display:block">
     <div class="modal-actions">
       <button class="btn btn-primary" onclick="closeModal()">Close</button>
@@ -4684,8 +4684,8 @@ function renderKidDiamonds() {
   let html = `
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-val">${dmds}</div><div class="stat-label">💎 Diamonds</div></div>
-      <div class="stat-card"><div class="stat-val">${tot}</div><div class="stat-label">🏆 All Time</div></div>
-      <div class="stat-card"><div class="stat-val">${D.settings.currency||'$'}${sav.toFixed(2)}</div><div class="stat-label">💰 Savings</div></div>
+      <div class="stat-card"><div class="stat-val">${tot}</div><div class="stat-label"><i class="ph-duotone ph-trophy" style="color:#D97706;font-size:0.95rem;vertical-align:middle"></i> All Time</div></div>
+      <div class="stat-card"><div class="stat-val">${D.settings.currency||'$'}${sav.toFixed(2)}</div><div class="stat-label"><i class="ph-duotone ph-piggy-bank" style="color:#16A34A;font-size:0.95rem;vertical-align:middle"></i> Savings</div></div>
     </div>`;
 
   // Level progress banner
@@ -4699,7 +4699,7 @@ function renderKidDiamonds() {
           ${next
             ? `<div class="level-banner-sub">${xpIntoLevel} / ${xpNeeded} XP to ${next.name} ${next.icon}</div>
                <div class="level-xp-bar"><div class="level-xp-fill" style="width:${pct}%"></div></div>`
-            : `<div class="level-banner-sub">🏆 Max level reached!</div>
+            : `<div class="level-banner-sub"><i class="ph-duotone ph-trophy" style="color:#D97706;font-size:0.9rem;vertical-align:middle"></i> Max level reached!</div>
                <div class="level-xp-bar"><div class="level-xp-fill" style="width:100%"></div></div>`}
         </div>
       </div>`;
@@ -4711,7 +4711,7 @@ function renderKidDiamonds() {
     const best   = m.streak?.best    || 0;
     html += `
       <div class="streak-row">
-        <div class="streak-flame">🔥</div>
+        <div class="streak-flame"><i class="ph-duotone ph-fire" style="color:#F97316"></i></div>
         <div class="streak-info">
           <div class="streak-count">${streak}-day streak</div>
           <div class="streak-label">Best: ${best} days · Keep going!</div>
@@ -4723,7 +4723,7 @@ function renderKidDiamonds() {
   const earned = Array.isArray(m.badges) ? m.badges : [];
   html += `
     <div class="card">
-      <div class="card-title">🏅 Badges</div>
+      <div class="card-title"><i class="ph-duotone ph-medal" style="color:#7C3AED;font-size:1rem;vertical-align:middle"></i> Badges</div>
       <div class="badge-grid">
         ${BADGE_DEFS.map(b => {
           const have = earned.includes(b.id);
@@ -4737,7 +4737,7 @@ function renderKidDiamonds() {
   if (nextPrize) {
     html += `
       <div class="card">
-        <div class="card-title">🎯 Next Prize</div>
+        <div class="card-title"><i class="ph-duotone ph-target" style="color:#6C63FF;font-size:1rem;vertical-align:middle"></i> Next Prize</div>
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
           <span style="font-size:2rem">${nextPrize.icon}</span>
           <div style="flex:1">
@@ -4749,13 +4749,13 @@ function renderKidDiamonds() {
         <div class="progress-wrap"><div class="progress-fill" style="width:${pctToNext}%"></div></div>
       </div>`;
   } else if (D.prizes.filter(p=>p.type==='individual').length > 0) {
-    html += `<div class="card"><div class="text-center" style="padding:10px 0">🏆 You can afford all the prizes! Time to redeem!</div></div>`;
+    html += `<div class="card"><div class="text-center" style="padding:10px 0"><i class="ph-duotone ph-trophy" style="color:#D97706;font-size:1rem;vertical-align:middle"></i> You can afford all the prizes! Time to redeem!</div></div>`;
   }
 
   // Savings tracker
   html += `
     <div class="savings-card">
-      <div style="font-size:0.9rem;opacity:0.85;margin-bottom:4px">💰 My Savings Jar</div>
+      <div style="font-size:0.9rem;opacity:0.85;margin-bottom:4px"><i class="ph-duotone ph-piggy-bank" style="font-size:1rem;vertical-align:middle"></i> My Savings Jar</div>
       <div class="savings-amount">${D.settings.currency||'$'}${sav.toFixed(2)}</div>
       <div class="savings-label">Keep saving!</div>
       <button class="btn btn-secondary btn-sm" onclick="showSavingsModal('${m.id}')">+ Add Savings</button>
@@ -4763,12 +4763,12 @@ function renderKidDiamonds() {
 
   // History
   if (myHistory.length > 0) {
-    html += `<div class="card"><div class="card-title">📜 Recent Activity</div>`;
+    html += `<div class="card"><div class="card-title"><i class="ph-duotone ph-scroll" style="color:#9CA3AF;font-size:1rem;vertical-align:middle"></i> Recent Activity</div>`;
     myHistory.forEach(h => {
       const pos = h.diamonds > 0;
       html += `
         <div class="history-item">
-          <span class="history-icon">${h.type==='chore'?'✅':h.type==='prize'?'🎁':h.type==='penalty'?'🔇':'🎯'}</span>
+          <span class="history-icon">${h.type==='chore'?'<i class="ph-duotone ph-check-circle" style="color:#16A34A"></i>':h.type==='prize'?'<i class="ph-duotone ph-gift" style="color:#1D4ED8"></i>':h.type==='penalty'?'<i class="ph-duotone ph-speaker-slash" style="color:#991B1B"></i>':'<i class="ph-duotone ph-target" style="color:#D97706"></i>'}</span>
           <div class="history-info">
             <div class="history-title">${esc(h.title)}</div>
             <div class="history-date">${fmtDate(h.date)}</div>
@@ -4778,7 +4778,7 @@ function renderKidDiamonds() {
     });
     html += `</div>`;
   } else {
-    html += `<div class="empty-state"><div class="empty-icon">📜</div><div class="empty-text">Complete chores to earn diamonds!</div></div>`;
+    html += `<div class="empty-state"><div class="empty-icon"><i class="ph-duotone ph-scroll" style="color:#9CA3AF;font-size:3rem"></i></div><div class="empty-text">Complete chores to earn diamonds!</div></div>`;
   }
 
   document.getElementById('kid-content').innerHTML = html;
@@ -4789,7 +4789,7 @@ function showSavingsModal(memberId) {
   if (!m) return;
   const rate = D.settings.diamondsPerDollar || 10;
   showModal(`
-    <div class="modal-title">💰 Savings Jar</div>
+    <div class="modal-title"><i class="ph-duotone ph-piggy-bank" style="color:#16A34A;font-size:1.2rem;vertical-align:middle"></i> Savings Jar</div>
     <p style="color:var(--muted);font-size:0.9rem;margin-bottom:16px">
       Convert diamonds to savings (${rate} 💎 = ${D.settings.currency||'$'}1.00) or ask a parent to add money directly.
     </p>
@@ -4799,7 +4799,7 @@ function showSavingsModal(memberId) {
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-teal" onclick="doSaveDiamonds('${memberId}')">Convert ✓</button>
+      <button class="btn btn-teal" onclick="doSaveDiamonds('${memberId}')">Convert <i class="ph-duotone ph-check" style="font-size:0.95rem;vertical-align:middle"></i></button>
     </div>`);
 }
 
@@ -4832,7 +4832,7 @@ function renderKidShop() {
   if (indiv.length === 0) {
     document.getElementById('kid-content').innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">🎁</div>
+        <div class="empty-icon"><i class="ph-duotone ph-gift" style="color:#FF6584;font-size:3rem"></i></div>
         <div class="empty-text">No prizes yet! Ask a parent to add some.</div>
       </div>`;
     return;
@@ -4860,7 +4860,7 @@ function renderKidShop() {
       </div>
       ${tiny?`<div style="font-size:2rem">${m.avatar}</div>`:''}
     </div>
-    <div class="section-row"><span class="section-title">🎁 My Prizes</span></div>
+    <div class="section-row"><span class="section-title"><i class="ph-duotone ph-gift" style="color:#FF6584;font-size:1rem;vertical-align:middle"></i> My Prizes</span></div>
     <div class="prize-grid">${indiv.map(p=>renderPrizeCard(p)).join('')}</div>`;
 
   document.getElementById('kid-content').innerHTML = html;
@@ -4885,7 +4885,7 @@ function kidRedeemPrize(prizeId, evt) {
     <p style="margin-bottom:20px;line-height:1.6">Redeem <strong>${esc(prize.title)}</strong> for ${prize.cost} of your 💎 ${dmds} diamonds?</p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Not yet</button>
-      <button class="btn btn-primary" onclick="confirmRedeem('${prizeId}')">Yes, redeem! 🎉</button>
+      <button class="btn btn-primary" onclick="confirmRedeem('${prizeId}')">Yes, redeem! <i class="ph-duotone ph-confetti" style="font-size:1rem;vertical-align:middle"></i></button>
     </div>`);
 }
 
@@ -4918,7 +4918,7 @@ function renderKidTeam() {
   if (goals.length === 0) {
     document.getElementById('kid-content').innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">🏆</div>
+        <div class="empty-icon"><i class="ph-duotone ph-trophy" style="color:#D97706;font-size:3rem"></i></div>
         <div class="empty-text">No team prizes yet! Ask a parent to add some.</div>
       </div>`;
     return;
@@ -4947,7 +4947,7 @@ function renderKidTeam() {
         <div class="goal-title">${esc(g.title)}</div>
         <div class="goal-sub">${total} / ${target} 💎</div>
         <div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${pct}%"></div></div>
-        <div class="goal-dmds">${pct}% there! ${reached?'🏆 Goal reached!':''}</div>
+        <div class="goal-dmds">${pct}% there! ${reached?'<i class="ph-duotone ph-trophy" style="color:#D97706;font-size:1rem;vertical-align:middle"></i> Goal reached!':''}</div>
         ${kids.length>1?`<div style="height:14px"></div>${contribs}`:''}
         ${!reached?`
           <div style="margin-top:14px">
@@ -4957,7 +4957,7 @@ function renderKidTeam() {
                  </button>`
               : `<div style="text-align:center;font-size:0.85rem;opacity:0.8">Complete chores to earn diamonds first!</div>`}
           </div>`
-        : `<div style="text-align:center;margin-top:12px;font-size:0.85rem;opacity:0.9">Tell a parent to collect the reward! 🎉</div>`}
+        : `<div style="text-align:center;margin-top:12px;font-size:0.85rem;opacity:0.9">Tell a parent to collect the reward! <i class="ph-duotone ph-confetti" style="font-size:1rem;vertical-align:middle"></i></div>`}
       </div>`;
   }).join('');
 
@@ -4969,7 +4969,7 @@ function renderKidTeam() {
       </div>
       ${tiny?`<div style="font-size:2rem">${m.avatar}</div>`:''}
     </div>
-    <div class="section-row"><span class="section-title">🏆 Team Prizes</span></div>
+    <div class="section-row"><span class="section-title"><i class="ph-duotone ph-trophy" style="color:#D97706;font-size:1rem;vertical-align:middle"></i> Team Prizes</span></div>
     ${goalCards}`;
 }
 
@@ -4978,7 +4978,7 @@ function showContributeModal(memberId, goalId) {
   const goal = D.teamGoals?.find(g => g.id === goalId);
   if (!m || !goal) return;
   showModal(`
-    <div class="modal-title">🏆 ${esc(goal.title)}</div>
+    <div class="modal-title"><i class="ph-duotone ph-trophy" style="color:#D97706;font-size:1.2rem;vertical-align:middle"></i> ${esc(goal.title)}</div>
     <p style="color:var(--muted);font-size:0.9rem;margin-bottom:16px">
       You have <strong>${m.diamonds||0} 💎</strong>. How many do you want to contribute?
     </p>
@@ -4999,7 +4999,7 @@ function doContrib(memberId, goalId) {
   const ok = doContributeToGoal(memberId, goalId, dmds);
   closeModal();
   if (!ok) { toast('Not enough diamonds!'); return; }
-  toast(`+${dmds} 💎 contributed to "${goal?.title}"! 🏆`);
+  toast(`+${dmds} 💎 contributed to "${goal?.title}"! <i class="ph-duotone ph-trophy" style="color:#D97706;font-size:0.9rem;vertical-align:middle"></i>`);
   const m = getMember(memberId);
   if (isTiny(m)) speak(`You gave ${dmds} diamonds to the team! Amazing!`);
   renderKidTeam();
@@ -5035,8 +5035,8 @@ function renderParentHeader() {
       </div>
     </div>
     <div class="header-actions">
-      ${pending>0    ? `<span class="header-badge" style="background:#EF4444;color:#fff" title="Needs approval">⏳ ${pending}</span>` : ''}
-      ${inProgress>0 ? `<span class="header-badge" style="background:#3B82F6;color:#fff" title="Kid actively working">🔨 ${inProgress}</span>` : ''}
+      ${pending>0    ? `<span class="header-badge" style="background:#EF4444;color:#fff" title="Needs approval"><i class="ph-duotone ph-hourglass" style="font-size:0.8rem;vertical-align:middle"></i> ${pending}</span>` : ''}
+      ${inProgress>0 ? `<span class="header-badge" style="background:#3B82F6;color:#fff" title="Kid actively working"><i class="ph-duotone ph-hammer" style="font-size:0.8rem;vertical-align:middle"></i> ${inProgress}</span>` : ''}
       <button class="btn-icon-sm" style="background:#F3F4F6" onclick="openUserSettings()" title="Settings"><i class="ph-duotone ph-gear-six" style="color:#6C63FF;font-size:1.15rem"></i></button>
     </div>`;
 }
@@ -5212,7 +5212,7 @@ function renderMemberStatsCard(member) {
   }
   const choreBadgeGrid = choreBadgeKeys.length === 0 ? '' : `
     <div style="margin-bottom:18px">
-      <div style="font-size:0.78rem;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#9ca3af;margin-bottom:8px">🏅 Chore Badges</div>
+      <div style="font-size:0.78rem;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#9ca3af;margin-bottom:8px"><i class="ph-duotone ph-medal" style="color:#7C3AED;vertical-align:middle"></i> Chore Badges</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px">
         ${choreBadgeKeys.map(key => {
           const def = choreBadgeLookup[key];
@@ -5246,7 +5246,7 @@ function renderMemberStatsCard(member) {
   const choreTableRows = s.choreBreakdown.map(([name,count]) => [name, count]);
   const choreTable = `
     <div style="margin-bottom:18px">
-      <div style="font-size:0.78rem;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#9ca3af;margin-bottom:8px">📋 Chore Breakdown</div>
+      <div style="font-size:0.78rem;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#9ca3af;margin-bottom:8px"><i class="ph-duotone ph-clipboard-text" style="color:#9CA3AF;vertical-align:middle"></i> Chore Breakdown</div>
       ${_statBreakdownTable(choreTableRows.slice(0,10), 'Chore', 'times')}
     </div>`;
 
@@ -5256,7 +5256,7 @@ function renderMemberStatsCard(member) {
   ]);
   const prizeTable = `
     <div style="margin-bottom:18px">
-      <div style="font-size:0.78rem;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#9ca3af;margin-bottom:8px">🎁 Prize Breakdown</div>
+      <div style="font-size:0.78rem;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#9ca3af;margin-bottom:8px"><i class="ph-duotone ph-gift" style="color:#FF6584;vertical-align:middle"></i> Prize Breakdown</div>
       ${prizeTableRows.length
         ? `<table style="width:100%;border-collapse:collapse;font-size:0.85rem">
             ${prizeTableRows.slice(0,10).map(([name,val],i) => `
@@ -5296,13 +5296,13 @@ function renderStatsPage(container) {
   const isKid  = viewer?.role === 'kid';
   const kids   = D.family.members.filter(m => m.role === 'kid');
 
-  let html = `<div style="padding-bottom:20px"><div style="font-size:1.2rem;font-weight:800;padding:16px 0 12px">📊 Lifetime Stats</div>`;
+  let html = `<div style="padding-bottom:20px"><div style="font-size:1.2rem;font-weight:800;padding:16px 0 12px"><i class="ph-duotone ph-chart-bar" style="color:#6C63FF;vertical-align:middle"></i> Lifetime Stats</div>`;
 
   if (isKid) {
     html += renderMemberStatsCard(viewer);
   } else {
     if (kids.length === 0) {
-      html += `<div class="empty-state"><div class="empty-icon">👶</div><div class="empty-text">No kids added yet</div></div>`;
+      html += `<div class="empty-state"><div class="empty-icon"><i class="ph-duotone ph-smiley" style="color:#9CA3AF;font-size:3rem"></i></div><div class="empty-text">No kids added yet</div></div>`;
     } else {
       kids.forEach(kid => { html += renderMemberStatsCard(kid); });
     }
@@ -5329,7 +5329,7 @@ function renderParentHome() {
   let html = '';
   if (pending.length > 0) {
     html += `<div class="card" style="border:2px solid var(--yellow)">
-      <div class="card-title">⏳ Needs Approval</div>`;
+      <div class="card-title"><i class="ph-duotone ph-hourglass" style="color:#3B82F6;font-size:1rem;vertical-align:middle"></i> Needs Approval</div>`;
     pending.forEach(({chore, memberId, entry}) => {
       const mem = getMember(memberId);
       if (!mem) return;
@@ -5355,7 +5355,7 @@ function renderParentHome() {
           </div>
           <div class="admin-actions" style="align-self:flex-start">
             <button class="btn-icon-sm btn-icon-approve" onclick="approveChore('${chore.id}','${memberId}','${entry.id}')"><i class="ph-duotone ph-check" style="color:#16A34A;font-size:1rem"></i></button>
-            <button class="btn-icon-sm btn-icon-reject"  onclick="rejectChore('${chore.id}','${memberId}','${entry.id}')">✕</button>
+            <button class="btn-icon-sm btn-icon-reject"  onclick="rejectChore('${chore.id}','${memberId}','${entry.id}')"><i class="ph-duotone ph-x" style="font-size:0.9rem"></i></button>
           </div>
         </div>`;
     });
@@ -5365,7 +5365,7 @@ function renderParentHome() {
   // Kids overview
   let kidsHtml = '';
   if (kids.length === 0) {
-    kidsHtml = `<div class="empty-state"><div class="empty-icon">👶</div><div class="empty-text">No kids yet — go to Setup!</div></div>`;
+    kidsHtml = `<div class="empty-state"><div class="empty-icon"><i class="ph-duotone ph-smiley" style="color:#9CA3AF;font-size:3rem"></i></div><div class="empty-text">No kids yet — go to Setup!</div></div>`;
   }
   kids.forEach(kid => {
     const myChores  = D.chores.filter(c=>c.assignedTo?.includes(kid.id));
@@ -5425,7 +5425,7 @@ function renderParentHome() {
           return `
             <div class="kid-overview-item" style="${isCombo ? 'background:#FFFBEB;box-shadow:inset 3px 0 0 #F59E0B;' : ''}${isExpanded ? 'flex-wrap:wrap;' : ''}">
               <div style="flex:1;min-width:0">
-                <div style="font-weight:700">${renderIcon(chore.icon,chore.iconColor,'font-size:1.1rem;vertical-align:middle')} ${esc(chore.title)}${isCombo ? ' <span style="font-size:0.65rem;font-weight:800;color:#D97706;vertical-align:middle">⚡</span>' : ''}</div>
+                <div style="font-weight:700">${renderIcon(chore.icon,chore.iconColor,'font-size:1.1rem;vertical-align:middle')} ${esc(chore.title)}${isCombo ? ' <i class="ph-duotone ph-lightning" style="font-size:0.75rem;color:#D97706;vertical-align:middle"></i>' : ''}</div>
                 <div style="font-size:0.82rem;color:var(--muted)">${fmtDmds(chore.diamonds)} · ${esc(choreScheduleSummary(chore))}</div>
               </div>
               <span class="kid-overview-status ${statusClass}">${statusLabel}</span>
@@ -5449,12 +5449,12 @@ function renderParentHome() {
         ${choreRows}
       </div>`;
   });
-  html += `<div class="card"><div class="card-title">👨‍👩‍👧‍👦 Kids Today</div>${kids.length>0?`<div class="overview-kids-grid">${kidsHtml}</div>`:kidsHtml}</div>`;
+  html += `<div class="card"><div class="card-title"><i class="ph-duotone ph-users-three" style="color:#6C63FF;font-size:1rem;vertical-align:middle"></i> Kids Today</div>${kids.length>0?`<div class="overview-kids-grid">${kidsHtml}</div>`:kidsHtml}</div>`;
 
   // Today's activities
   const todayActivities = D.activities.filter(a=>a.date===t);
   if (todayActivities.length > 0) {
-    html += `<div class="card"><div class="card-title">📅 Today's Plans</div>`;
+    html += `<div class="card"><div class="card-title"><i class="ph-duotone ph-calendar-blank" style="color:#6C63FF;font-size:1rem;vertical-align:middle"></i> Today's Plans</div>`;
     todayActivities.forEach(a => { html += activityCard(a); });
     html += `</div>`;
   }
@@ -5462,14 +5462,14 @@ function renderParentHome() {
   // Quick actions
   html += `
     <div class="card">
-      <div class="card-title">⚡ Quick Actions</div>
+      <div class="card-title"><i class="ph-duotone ph-lightning" style="color:#F59E0B;font-size:1rem;vertical-align:middle"></i> Quick Actions</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <button class="btn btn-primary btn-sm" onclick="showChoreModal()">+ Add Chore</button>
         <button class="btn btn-pink   btn-sm" onclick="showPrizeModal()">+ Add Prize</button>
-        <button class="btn btn-teal   btn-sm" onclick="showGoalModal()">🎯 Set Goal</button>
+        <button class="btn btn-teal   btn-sm" onclick="showGoalModal()"><i class="ph-duotone ph-target" style="font-size:1rem;vertical-align:middle"></i> Set Goal</button>
         <button class="btn btn-warning btn-sm" onclick="showActivityModal()">+ Plan Event</button>
         <button class="btn btn-danger  btn-sm" style="grid-column:span 2;background:#EF4444;color:#fff;font-size:1rem;padding:14px"
-                onclick="showNotListening()">🔇 You're Not Listening</button>
+                onclick="showNotListening()"><i class="ph-duotone ph-speaker-slash" style="font-size:1.1rem;vertical-align:middle"></i> You're Not Listening</button>
       </div>
     </div>`;
 
@@ -5486,19 +5486,19 @@ function renderParentHome() {
   }).join('');
   html += `
     <div class="card">
-      <div class="card-title">🔇 Not-Listening Time Today</div>
+      <div class="card-title"><i class="ph-duotone ph-speaker-slash" style="color:#EF4444;font-size:1rem;vertical-align:middle"></i> Not-Listening Time Today</div>
       ${nlRows || '<div style="color:var(--muted);font-size:0.9rem">No kids added yet</div>'}
     </div>`;
 
   // Recent Activity
   const recentHistory = (D.history || []).slice(0, 10);
   if (recentHistory.length > 0) {
-    const typeIcon = { chore:'✅', prize:'🎁', penalty:'🔇', bonus:'⚡', level:'🏆' };
+    const typeIcon = { chore:'<i class="ph-duotone ph-check-circle" style="color:#16A34A"></i>', prize:'<i class="ph-duotone ph-gift" style="color:#1D4ED8"></i>', penalty:'<i class="ph-duotone ph-speaker-slash" style="color:#991B1B"></i>', bonus:'<i class="ph-duotone ph-lightning" style="color:#D97706"></i>', level:'<i class="ph-duotone ph-trophy" style="color:#D97706"></i>' };
     const typeColor = { chore:'#166534', prize:'#1e40af', penalty:'#991b1b', bonus:'#92400e', level:'#4c1d95' };
     const typeBg    = { chore:'#DCFCE7', prize:'#DBEAFE', penalty:'#FEE2E2', bonus:'#FEF3C7', level:'#EDE9FE' };
     const actRows = recentHistory.map(h => {
       const mem = getMember(h.memberId);
-      const icon = typeIcon[h.type] || '📝';
+      const icon = typeIcon[h.type] || '<i class="ph-duotone ph-note" style="color:#9CA3AF"></i>';
       const color = typeColor[h.type] || '#374151';
       const bg    = typeBg[h.type]   || '#f9fafb';
       const ptsStr = h.diamonds > 0 ? `+${h.diamonds}` : `${h.diamonds}`;
@@ -5515,7 +5515,7 @@ function renderParentHome() {
     html += `
       <details class="card" style="padding:0">
         <summary style="padding:16px 20px;cursor:pointer;font-weight:700;font-size:1rem;list-style:none;display:flex;align-items:center;gap:8px">
-          <span>📋 Recent Activity</span>
+          <span><i class="ph-duotone ph-clipboard-text" style="color:#9CA3AF;font-size:1rem;vertical-align:middle"></i> Recent Activity</span>
           <span style="font-size:0.75rem;color:var(--muted);font-weight:400;margin-left:auto">tap to expand</span>
         </summary>
         <div style="padding:0 20px 16px">${actRows}</div>
@@ -5529,7 +5529,7 @@ function approveChore(choreId, memberId, entryId) {
   doApproveChore(choreId, memberId, entryId);
   const m = getMember(memberId);
   const c = D.chores.find(x=>x.id===choreId);
-  toast(`✅ Approved "${c?.title}" for ${m?.name} (+${c?.diamonds} 💎)`);
+  toast(`Approved "${c?.title}" for ${m?.name} (+${c?.diamonds} 💎)`);
   renderParentHome();
   renderParentHeader();
   renderParentNav();
@@ -5588,7 +5588,7 @@ function parentMarkChoreDone(choreId, memberId) {
   checkAfterDiamondsAwarded(member, totalPts);
   checkChoreBadges(chore, memberId);
   saveData();
-  toast(`✅ Marked "${chore.title}" done for ${member.name} (+${totalPts} 💎)`);
+  toast(`Marked "${chore.title}" done for ${member.name} (+${totalPts} 💎)`);
   renderParentHome();
   renderParentHeader();
   renderParentNav();
@@ -5643,7 +5643,7 @@ function parentMarkSlotDone(choreId, memberId, slotId) {
   checkAfterDiamondsAwarded(member, chore.diamonds);
   checkChoreBadges(chore, memberId);
   saveData();
-  toast(`✅ ${renderIcon(chore.icon,chore.iconColor,'font-size:1rem;vertical-align:middle')} ${esc(slotStatus.slot.label || 'Slot')} done for ${esc(member.name)} (+${chore.diamonds} 💎)`);
+  toast(`${renderIcon(chore.icon,chore.iconColor,'font-size:1rem;vertical-align:middle')} ${esc(slotStatus.slot.label || 'Slot')} done for ${esc(member.name)} (+${chore.diamonds} 💎)`);
   renderParentHome();
   renderParentHeader();
   renderParentNav();
@@ -5768,12 +5768,12 @@ function renderParentChores() {
   const kids = D.family.members.filter(m=>m.role==='kid');
   let html = `
     <div class="section-row">
-      <span class="section-title">📋 All Chores (${D.chores.length})</span>
+      <span class="section-title"><i class="ph-duotone ph-clipboard-text" style="color:#9CA3AF;font-size:1rem;vertical-align:middle"></i> All Chores (${D.chores.length})</span>
       <button class="btn btn-primary btn-sm" onclick="showChoreModal()">+ Add</button>
     </div>`;
 
   if (D.chores.length === 0) {
-    html += `<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">No chores yet. Add one!</div></div>`;
+    html += `<div class="empty-state"><div class="empty-icon"><i class="ph-duotone ph-clipboard-text" style="color:#9CA3AF;font-size:3rem"></i></div><div class="empty-text">No chores yet. Add one!</div></div>`;
   }
 
   html += `<div id="chore-sort-list">`;
@@ -5788,8 +5788,8 @@ function renderParentChores() {
           <div class="admin-meta">${fmtDmds(chore.diamonds)} · ${esc(choreScheduleSummary(chore))} · ${assignedKids||'no one'}</div>
         </div>
         <div class="admin-actions">
-          <button class="btn-icon-sm btn-icon-edit"   onclick="showChoreModal('${chore.id}')">✏️</button>
-          <button class="btn-icon-sm btn-icon-delete" onclick="deleteChore('${chore.id}')">🗑️</button>
+          <button class="btn-icon-sm btn-icon-edit"   onclick="showChoreModal('${chore.id}')"><i class="ph-duotone ph-pencil-simple" style="color:#374151;font-size:1rem"></i></button>
+          <button class="btn-icon-sm btn-icon-delete" onclick="deleteChore('${chore.id}')"><i class="ph-duotone ph-trash" style="color:#EF4444;font-size:1rem"></i></button>
         </div>
       </div>`;
   });
@@ -5882,8 +5882,8 @@ function showChoreModal(choreId) {
       <div class="form-group">
         <label class="form-label">Completion style</label>
         <div class="display-mode-row" style="grid-template-columns:1fr 1fr;margin-top:0">
-          <button class="mode-opt${!hasSlots?' sel':''}" id="cm-style-simple" onclick="setChoreStyle('simple')"><span class="mode-opt-icon">🔢</span>Simple count</button>
-          <button class="mode-opt${hasSlots?' sel':''}"  id="cm-style-slots"  onclick="setChoreStyle('slots')"><span class="mode-opt-icon">⏰</span>Timed slots</button>
+          <button class="mode-opt${!hasSlots?' sel':''}" id="cm-style-simple" onclick="setChoreStyle('simple')"><span class="mode-opt-icon"><i class="ph-duotone ph-list-numbers" style="font-size:1.1rem"></i></span>Simple count</button>
+          <button class="mode-opt${hasSlots?' sel':''}"  id="cm-style-slots"  onclick="setChoreStyle('slots')"><span class="mode-opt-icon"><i class="ph-duotone ph-clock" style="font-size:1.1rem"></i></span>Timed slots</button>
         </div>
         <div class="schedule-help" style="margin-top:6px" id="cm-style-help">${hasSlots?'Each slot earns diamonds independently when completed during its window.':'Kids must complete the chore a set number of times. All must be done before diamonds are awarded.'}</div>
       </div>
@@ -5919,7 +5919,7 @@ function showChoreModal(choreId) {
     </div>
     ${kids.length>0?`<div class="form-group"><label class="form-label">Assign to</label>${assignOpts}</div>`:''}
     <div class="form-group">
-      <label class="form-label">📷 Photo requirement</label>
+      <label class="form-label"><i class="ph-duotone ph-camera" style="color:#6C63FF;font-size:1rem;vertical-align:middle"></i> Photo requirement</label>
       <select id="cm-photo">
         <option value="none"         ${c.photoMode==='none'        ||!c.photoMode?'selected':''}>No photo needed</option>
         <option value="after"        ${c.photoMode==='after'       ?'selected':''}>Completion photo (after only)</option>
@@ -5935,7 +5935,7 @@ function showChoreModal(choreId) {
     </div>
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <label class="form-label" style="margin-bottom:0">🏅 Chore Badges</label>
+        <label class="form-label" style="margin-bottom:0"><i class="ph-duotone ph-medal" style="color:#7C3AED;font-size:1rem;vertical-align:middle"></i> Chore Badges</label>
         <label class="toggle" style="transform:scale(0.85);transform-origin:right center">
           <input type="checkbox" id="cm-badges-on" ${_editBadges.length>0?'checked':''} onchange="toggleBadgeEditor(this.checked)">
           <span class="toggle-track"></span>
@@ -5948,7 +5948,7 @@ function showChoreModal(choreId) {
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveChore('${choreId||''}')">Save ✓</button>
+      <button class="btn btn-primary" onclick="saveChore('${choreId||''}')">Save <i class="ph-duotone ph-check" style="font-size:0.95rem;vertical-align:middle"></i></button>
     </div>`);
 
   toggleChoreScheduleFields();
@@ -6015,9 +6015,9 @@ function renderBadgeEditor() {
       <input type="text" value="${esc(b.name||'')}" placeholder="Badge name" style="flex:1;border:1px solid #d1d5db;border-radius:6px;padding:4px 6px;font-size:0.85rem"
         oninput="_editBadges[${i}].name=this.value">
       <label title="Secret — hidden until earned" style="display:flex;align-items:center;gap:3px;font-size:0.72rem;font-weight:600;color:${b.secret?'#7c3aed':'#9ca3af'};cursor:pointer;flex-shrink:0;user-select:none">
-        <input type="checkbox" ${b.secret?'checked':''} onchange="_editBadges[${i}].secret=this.checked;renderBadgeEditor()" style="cursor:pointer">🔒
+        <input type="checkbox" ${b.secret?'checked':''} onchange="_editBadges[${i}].secret=this.checked;renderBadgeEditor()" style="cursor:pointer"><i class="ph-duotone ph-lock" style="font-size:0.85rem;vertical-align:middle"></i>
       </label>
-      <button onclick="removeChoreBadge(${i})" style="background:#FEE2E2;color:#991b1b;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:0.8rem;flex-shrink:0">✕</button>
+      <button onclick="removeChoreBadge(${i})" style="background:#FEE2E2;color:#991b1b;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:0.8rem;flex-shrink:0"><i class="ph-duotone ph-x" style="font-size:0.9rem"></i></button>
     </div>`).join('');
   const addBtn = document.querySelector('#cm-badge-editor > button');
   if (addBtn) addBtn.style.display = _editBadges.length >= 5 ? 'none' : '';
@@ -6042,7 +6042,7 @@ function renderSlotEditor() {
       <input type="text" placeholder="Label (e.g. Morning)" value="${esc(slot.label)}" oninput="_editSlots[${i}].label=this.value">
       <input type="time" value="${slot.start}" oninput="_editSlots[${i}].start=this.value">
       <input type="time" value="${slot.end}"   oninput="_editSlots[${i}].end=this.value">
-      <button class="slot-remove-btn" onclick="removeChoreSlot(${i})">✕</button>
+      <button class="slot-remove-btn" onclick="removeChoreSlot(${i})"><i class="ph-duotone ph-x" style="font-size:0.9rem"></i></button>
     </div>`).join('');
 }
 
@@ -6139,12 +6139,12 @@ function renderParentPrizes() {
   const indiv = D.prizes.filter(p => p.type === 'individual').slice().sort(sortFn);
   let html = `
     <div class="section-row">
-      <span class="section-title">🎁 Individual Prizes (${indiv.length})</span>
+      <span class="section-title"><i class="ph-duotone ph-gift" style="color:#FF6584;font-size:1rem;vertical-align:middle"></i> Individual Prizes (${indiv.length})</span>
       <button class="btn btn-primary btn-sm" onclick="showPrizeModal()">+ Add</button>
     </div>`;
 
   if (indiv.length === 0) {
-    html += `<div class="empty-state"><div class="empty-icon">🎁</div><div class="empty-text">No prizes yet. Add one!</div></div>`;
+    html += `<div class="empty-state"><div class="empty-icon"><i class="ph-duotone ph-gift" style="color:#FF6584;font-size:3rem"></i></div><div class="empty-text">No prizes yet. Add one!</div></div>`;
   }
 
   indiv.forEach(p => {
@@ -6156,8 +6156,8 @@ function renderParentPrizes() {
           <div class="admin-meta">${p.cost} 💎</div>
         </div>
         <div class="admin-actions">
-          <button class="btn-icon-sm btn-icon-edit"   onclick="showPrizeModal('${p.id}')">✏️</button>
-          <button class="btn-icon-sm btn-icon-delete" onclick="deletePrize('${p.id}')">🗑️</button>
+          <button class="btn-icon-sm btn-icon-edit"   onclick="showPrizeModal('${p.id}')"><i class="ph-duotone ph-pencil-simple" style="color:#374151;font-size:1rem"></i></button>
+          <button class="btn-icon-sm btn-icon-delete" onclick="deletePrize('${p.id}')"><i class="ph-duotone ph-trash" style="color:#EF4444;font-size:1rem"></i></button>
         </div>
       </div>`;
   });
@@ -6166,12 +6166,12 @@ function renderParentPrizes() {
   const goals = (D.teamGoals || []).slice().sort(sortFn);
   html += `<div class="divider"></div>
     <div class="section-row">
-      <span class="section-title">🏆 Team Prizes (${goals.length})</span>
+      <span class="section-title"><i class="ph-duotone ph-trophy" style="color:#D97706;font-size:1rem;vertical-align:middle"></i> Team Prizes (${goals.length})</span>
       <button class="btn btn-teal btn-sm" onclick="showGoalModal()">+ Add</button>
     </div>`;
 
   if (goals.length === 0) {
-    html += `<div class="empty-state" style="padding:20px"><div class="empty-icon">🏆</div><div class="empty-text">No team prizes yet</div></div>`;
+    html += `<div class="empty-state" style="padding:20px"><div class="empty-icon"><i class="ph-duotone ph-trophy" style="color:#D97706;font-size:3rem"></i></div><div class="empty-text">No team prizes yet</div></div>`;
   }
 
   goals.forEach(g => {
@@ -6188,8 +6188,8 @@ function renderParentPrizes() {
           </div>
         </div>
         <div class="admin-actions">
-          <button class="btn-icon-sm btn-icon-edit"   onclick="showGoalModal('${g.id}')">✏️</button>
-          <button class="btn-icon-sm btn-icon-delete" onclick="clearGoal('${g.id}')">🗑️</button>
+          <button class="btn-icon-sm btn-icon-edit"   onclick="showGoalModal('${g.id}')"><i class="ph-duotone ph-pencil-simple" style="color:#374151;font-size:1rem"></i></button>
+          <button class="btn-icon-sm btn-icon-delete" onclick="clearGoal('${g.id}')"><i class="ph-duotone ph-trash" style="color:#EF4444;font-size:1rem"></i></button>
         </div>
       </div>`;
   });
@@ -6229,7 +6229,7 @@ function showPrizeModal(prizeId) {
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="savePrize('${prizeId||''}')">Save ✓</button>
+      <button class="btn btn-primary" onclick="savePrize('${prizeId||''}')">Save <i class="ph-duotone ph-check" style="font-size:0.95rem;vertical-align:middle"></i></button>
     </div>`);
 }
 
@@ -6313,7 +6313,7 @@ function showGoalModal(goalId) {
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-teal" onclick="saveGoal()">Save ✓</button>
+      <button class="btn btn-teal" onclick="saveGoal()">Save <i class="ph-duotone ph-check" style="font-size:0.95rem;vertical-align:middle"></i></button>
     </div>`);
 }
 
@@ -6422,8 +6422,8 @@ function renderPlanActivityCard(a, faded) {
     <div class="admin-card"${faded?' style="opacity:0.6"':''}>
       ${activityCard(a)}
       <div class="admin-actions" style="margin-left:auto;align-self:flex-start">
-        <button class="btn-icon-sm btn-icon-edit" onclick="showActivityModal('${a.id}')">✏️</button>
-        <button class="btn-icon-sm btn-icon-delete" onclick="deleteActivity('${a.id}')">🗑️</button>
+        <button class="btn-icon-sm btn-icon-edit" onclick="showActivityModal('${a.id}')"><i class="ph-duotone ph-pencil-simple" style="color:#374151;font-size:1rem"></i></button>
+        <button class="btn-icon-sm btn-icon-delete" onclick="deleteActivity('${a.id}')"><i class="ph-duotone ph-trash" style="color:#EF4444;font-size:1rem"></i></button>
       </div>
     </div>`;
 }
@@ -6486,7 +6486,7 @@ function renderParentPlansDay(cursor) {
     .filter(a=>a.date===cursor)
     .sort((a,b)=>(a.time||'').localeCompare(b.time||''));
   if (!activities.length) {
-    return `<div class="empty-state"><div class="empty-icon">🗓️</div><div class="empty-text">Nothing planned for this day.</div></div>`;
+    return `<div class="empty-state"><div class="empty-icon"><i class="ph-duotone ph-calendar-blank" style="color:#9CA3AF;font-size:3rem"></i></div><div class="empty-text">Nothing planned for this day.</div></div>`;
   }
   return activities.map(a => renderPlanActivityCard(a, false)).join('');
 }
@@ -6501,7 +6501,7 @@ function renderParentPlans() {
 
   let html = `
     <div class="section-row">
-      <span class="section-title">📅 Plans & Activities</span>
+      <span class="section-title"><i class="ph-duotone ph-calendar-blank" style="color:#6C63FF;font-size:1rem;vertical-align:middle"></i> Plans & Activities</span>
       <button class="btn btn-primary btn-sm" onclick="showActivityModal()">+ Add</button>
     </div>
     <div class="schedule-toolbar">
@@ -6511,9 +6511,9 @@ function renderParentPlans() {
         <button class="schedule-nav-btn" onclick="shiftParentPlans(1)">›</button>
       </div>
       <div class="display-mode-row" style="margin-top:0">
-        <button class="mode-opt${S.plansView==='day'?' sel':''}" onclick="setParentPlansView('day')"><span class="mode-opt-icon">☀️</span>Day</button>
-        <button class="mode-opt${S.plansView==='week'?' sel':''}" onclick="setParentPlansView('week')"><span class="mode-opt-icon">🗓️</span>Week</button>
-        <button class="mode-opt${S.plansView==='month'?' sel':''}" onclick="setParentPlansView('month')"><span class="mode-opt-icon">📆</span>Month</button>
+        <button class="mode-opt${S.plansView==='day'?' sel':''}" onclick="setParentPlansView('day')"><span class="mode-opt-icon"><i class="ph-duotone ph-sun" style="font-size:1.1rem"></i></span>Day</button>
+        <button class="mode-opt${S.plansView==='week'?' sel':''}" onclick="setParentPlansView('week')"><span class="mode-opt-icon"><i class="ph-duotone ph-calendar-blank" style="font-size:1.1rem"></i></span>Week</button>
+        <button class="mode-opt${S.plansView==='month'?' sel':''}" onclick="setParentPlansView('month')"><span class="mode-opt-icon"><i class="ph-duotone ph-calendar-dots" style="font-size:1.1rem"></i></span>Month</button>
       </div>
     </div>`;
 
@@ -6593,7 +6593,7 @@ function showActivityModal(actId) {
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveActivity('${actId||''}')">Save ✓</button>
+      <button class="btn btn-primary" onclick="saveActivity('${actId||''}')">Save <i class="ph-duotone ph-check" style="font-size:0.95rem;vertical-align:middle"></i></button>
     </div>`);
 }
 
@@ -6733,10 +6733,10 @@ function advApplyRawJson() {
     const parsed = JSON.parse(ta.value);
     D = normalizeData(parsed);
     saveData();
-    if (statusEl) { statusEl.className = 'adv-status ok'; statusEl.textContent = '✅ Applied & saved successfully'; }
+    if (statusEl) { statusEl.className = 'adv-status ok'; statusEl.textContent = 'Applied & saved successfully'; }
     _advRenderPreserving();
   } catch(e) {
-    if (statusEl) { statusEl.className = 'adv-status err'; statusEl.textContent = `❌ JSON error: ${e.message}`; }
+    if (statusEl) { statusEl.className = 'adv-status err'; statusEl.textContent = `JSON error: ${e.message}`; }
   }
 }
 
@@ -6744,7 +6744,7 @@ function _advRefreshStatus(msg) {
   const el = document.getElementById('adv-save-status');
   if (!el) return;
   el.className = 'adv-status ok';
-  el.textContent = `✅ ${msg}`;
+  el.textContent = `${msg}`;
   clearTimeout(el._t);
   el._t = setTimeout(() => { el.textContent = ''; el.className = ''; }, 2000);
 }
@@ -6865,7 +6865,7 @@ function _advRender() {
 
   // ── History section ──
   const histItems = (D.history || []).slice(0, 40);
-  const typeIcon = { chore:'✅', prize:'🎁', penalty:'🔇', bonus:'⚡', level:'🏆' };
+  const typeIcon = { chore:'<i class="ph-duotone ph-check-circle" style="color:#16A34A"></i>', prize:'<i class="ph-duotone ph-gift" style="color:#1D4ED8"></i>', penalty:'<i class="ph-duotone ph-speaker-slash" style="color:#991B1B"></i>', bonus:'<i class="ph-duotone ph-lightning" style="color:#D97706"></i>', level:'<i class="ph-duotone ph-trophy" style="color:#D97706"></i>' };
   const histHtml = histItems.length === 0
     ? '<div style="color:#9ca3af;font-size:0.85rem">No history yet</div>'
     : histItems.map(h => {
@@ -6873,12 +6873,12 @@ function _advRender() {
         const ptsStr = (h.diamonds||0) >= 0 ? `+${h.diamonds}` : `${h.diamonds}`;
         const ptsCol = (h.diamonds||0) >= 0 ? '#166534' : '#991b1b';
         return `<div class="adv-hist-row" data-hist-id="${h.id}">
-          <span style="width:20px;text-align:center">${typeIcon[h.type]||'📝'}</span>
+          <span style="width:20px;text-align:center">${typeIcon[h.type]||'<i class="ph-duotone ph-note" style="color:#9CA3AF"></i>'}</span>
           <span style="width:24px">${mem?.avatar||''}</span>
           <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(h.title)}</span>
           <span style="color:${ptsCol};font-weight:700;white-space:nowrap;margin-right:6px">${ptsStr}</span>
           <span style="color:#9ca3af;white-space:nowrap;margin-right:8px">${h.date}</span>
-          <button onclick="advDeleteHistory('${h.id}')" style="background:#FEE2E2;color:#991b1b;border:none;border-radius:6px;padding:2px 8px;font-size:0.75rem;cursor:pointer;flex-shrink:0">✕</button>
+          <button onclick="advDeleteHistory('${h.id}')" style="background:#FEE2E2;color:#991b1b;border:none;border-radius:6px;padding:2px 8px;font-size:0.75rem;cursor:pointer;flex-shrink:0"><i class="ph-duotone ph-x" style="font-size:0.9rem"></i></button>
         </div>`;
       }).join('');
 
@@ -6898,51 +6898,51 @@ function _advRender() {
 
   root.innerHTML = `
     <div class="adv-editor-header">
-      <span>🔧</span>
+      <i class="ph-duotone ph-wrench" style="color:#fff;font-size:1.1rem"></i>
       <span class="adv-editor-title">Advanced Data Editor</span>
       <span id="adv-save-status" class="adv-status" style="margin-right:8px"></span>
-      <button class="adv-close-btn" onclick="closeAdvancedEditor()">✕</button>
+      <button class="adv-close-btn" onclick="closeAdvancedEditor()"><i class="ph-duotone ph-x" style="font-size:0.9rem"></i></button>
     </div>
     <div class="adv-editor-body">
 
       <div class="adv-section">
-        <div class="adv-section-heading">👤 Members (${members.length})</div>
+        <div class="adv-section-heading"><i class="ph-duotone ph-user" style="vertical-align:middle"></i> Members (${members.length})</div>
         <div class="adv-section-body">${membersHtml}</div>
       </div>
 
       <div class="adv-section">
-        <div class="adv-section-heading">📋 Chores (${D.chores.length}) — icon · title · diamonds</div>
+        <div class="adv-section-heading"><i class="ph-duotone ph-list" style="vertical-align:middle"></i> Chores (${D.chores.length}) — icon · title · diamonds</div>
         <div class="adv-section-body">${choresHtml}</div>
       </div>
 
       <div class="adv-section">
-        <div class="adv-section-heading">🎁 Prizes (${D.prizes.length}) — icon · title · cost</div>
+        <div class="adv-section-heading"><i class="ph-duotone ph-gift" style="vertical-align:middle"></i> Prizes (${D.prizes.length}) — icon · title · cost</div>
         <div class="adv-section-body">${prizesHtml}</div>
       </div>
 
       <div class="adv-section">
-        <div class="adv-section-heading">⚙️ Settings</div>
+        <div class="adv-section-heading"><i class="ph-duotone ph-gear-six" style="vertical-align:middle"></i> Settings</div>
         <div class="adv-section-body">${settingsHtml}</div>
       </div>
 
       <div class="adv-section">
-        <div class="adv-section-heading">🏆 Team Prizes (${teamGoals.length})</div>
+        <div class="adv-section-heading"><i class="ph-duotone ph-trophy" style="vertical-align:middle"></i> Team Prizes (${teamGoals.length})</div>
         <div class="adv-section-body">${goalHtml}</div>
       </div>
 
       <div class="adv-section">
-        <div class="adv-section-heading">📜 History — last 40 entries · tap ✕ to delete</div>
+        <div class="adv-section-heading"><i class="ph-duotone ph-scroll" style="vertical-align:middle"></i> History — last 40 entries · tap × to delete</div>
         <div class="adv-section-body">${histHtml}</div>
       </div>
 
       <div class="adv-section">
-        <div class="adv-section-heading">🗂️ Raw JSON — full database · edit with care</div>
+        <div class="adv-section-heading"><i class="ph-duotone ph-code" style="vertical-align:middle"></i> Raw JSON — full database · edit with care</div>
         <div class="adv-section-body">
-          <p style="font-size:0.78rem;color:#6b7280;margin:0 0 8px">⚠️ Clicking Apply overwrites all data. Invalid JSON will be rejected.</p>
+          <p style="font-size:0.78rem;color:#6b7280;margin:0 0 8px"><i class="ph-duotone ph-warning" style="color:#F59E0B;vertical-align:middle"></i> Clicking Apply overwrites all data. Invalid JSON will be rejected.</p>
           <textarea id="adv-raw-json" class="adv-raw-textarea">${esc(JSON.stringify(D, null, 2))}</textarea>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px">
             <button class="adv-apply-btn" onclick="advApplyRawJson()">Apply Raw JSON</button>
-            <button class="adv-apply-btn" style="background:#374151" onclick="document.getElementById('adv-raw-json').value=JSON.stringify(D,null,2)">↺ Reload</button>
+            <button class="adv-apply-btn" style="background:#374151" onclick="document.getElementById('adv-raw-json').value=JSON.stringify(D,null,2)"><i class="ph-duotone ph-arrow-clockwise" style="font-size:1rem;vertical-align:middle"></i> Reload</button>
             <span id="adv-json-status" class="adv-status"></span>
           </div>
         </div>
@@ -6964,7 +6964,7 @@ function renderParentSettings() {
 
   let html = `
     <div class="card">
-      <div class="card-title">⚙️ General</div>
+      <div class="card-title"><i class="ph-duotone ph-gear-six" style="color:#6C63FF;font-size:1rem;vertical-align:middle"></i> General</div>
       <div class="toggle-row">
         <div><div class="toggle-label">Auto-approve chores</div>
           <div class="toggle-sub">Kids earn diamonds instantly</div></div>
@@ -6994,32 +6994,32 @@ function renderParentSettings() {
       ${isBiometricSupported() ? `<div class="form-group">
         <label class="form-label">Face ID / Biometrics</label>
         ${getBiometricCredentialId()
-          ? `<button class="btn btn-secondary btn-sm" onclick="removeBiometric()">🔒 Remove Face ID</button>`
-          : `<button class="btn btn-secondary btn-sm" onclick="registerBiometric()">🔒 Set Up Face ID</button>`
+          ? `<button class="btn btn-secondary btn-sm" onclick="removeBiometric()"><i class="ph-duotone ph-fingerprint" style="font-size:1rem;vertical-align:middle"></i> Remove Face ID</button>`
+          : `<button class="btn btn-secondary btn-sm" onclick="registerBiometric()"><i class="ph-duotone ph-fingerprint" style="font-size:1rem;vertical-align:middle"></i> Set Up Face ID</button>`
         }
       </div>` : ''}
     </div>
 
     <div class="card">
-      <div class="card-title">🎮 Test Animations</div>
+      <div class="card-title"><i class="ph-duotone ph-game-controller" style="color:#6C63FF;font-size:1rem;vertical-align:middle"></i> Test Animations</div>
       <button class="btn btn-secondary btn-full" onclick="launchConfetti(60)">💎 Test Diamond Rain</button>
     </div>
 
     <div class="card" style="background:#F0FDF4;border:2px solid var(--green)">
-      <div class="card-title">☁️ Cloud Sync</div>
+      <div class="card-title"><i class="ph-duotone ph-cloud" style="color:#10B981;font-size:1rem;vertical-align:middle"></i> Cloud Sync</div>
       <p style="font-size:0.85rem;color:var(--muted);margin-bottom:14px">
         Sync is powered by Google Firestore and runs automatically in real time across devices.
       </p>
       <div style="display:flex;gap:10px;align-items:center">
-        <span style="font-size:0.9rem;color:var(--green);font-weight:600">✅ Automatic</span>
+        <span style="font-size:0.9rem;color:var(--green);font-weight:600"><i class="ph-duotone ph-check-circle" style="color:var(--green);vertical-align:middle"></i> Automatic</span>
         <button class="btn btn-secondary btn-sm" onclick="goHome()">Switch User</button>
-        <button class="btn btn-secondary btn-sm" onclick="location.reload(true)">🔄 Reload App</button>
+        <button class="btn btn-secondary btn-sm" onclick="location.reload(true)"><i class="ph-duotone ph-arrow-clockwise" style="font-size:1rem;vertical-align:middle"></i> Reload App</button>
       </div>
       ${s.lastSync?`<div style="font-size:0.78rem;color:var(--muted);margin-top:8px">Last synced: ${new Date(s.lastSync).toLocaleString()}</div>`:''}
     </div>
 
     <div class="card">
-      <div class="card-title">👨‍👩‍👧‍👦 Members</div>
+      <div class="card-title"><i class="ph-duotone ph-users-three" style="color:#6C63FF;font-size:1rem;vertical-align:middle"></i> Members</div>
       ${kids.map(k=>`
         <div class="member-row" style="border-left:4px solid ${k.color||'#6C63FF'}">
           <span class="member-avatar">${k.avatar}</span>
@@ -7029,14 +7029,14 @@ function renderParentSettings() {
           </div>
           <div style="display:flex;gap:6px">
             <button class="btn-icon-sm btn-icon-edit" onclick="showAddPointsModal('${k.id}')">💎</button>
-            <button class="btn-icon-sm" title="Split Household schedule" onclick="showSplitHouseholdModal('${k.id}')" style="font-size:0.95rem;${k.splitHousehold?.enabled ? 'background:var(--green);color:#fff;border-color:var(--green)' : ''}">🏠</button>
+            <button class="btn-icon-sm" title="Split Household schedule" onclick="showSplitHouseholdModal('${k.id}')" style="${k.splitHousehold?.enabled ? 'background:var(--green);color:#fff;border-color:var(--green)' : ''}"><i class="ph-duotone ph-house" style="font-size:1rem"></i></button>
           </div>
         </div>`).join('')}
       <button class="btn btn-secondary btn-sm btn-full mt-8" onclick="goSetup()">Edit Family Setup</button>
     </div>
 
     <div class="card">
-      <div class="card-title">🎮 Levels &amp; Streaks</div>
+      <div class="card-title"><i class="ph-duotone ph-trend-up" style="color:#0F766E;font-size:1rem;vertical-align:middle"></i> Levels &amp; Streaks</div>
       <div class="toggle-row">
         <div><div class="toggle-label">Enable leveling system</div>
           <div class="toggle-sub">Kids earn XP and unlock level titles</div></div>
@@ -7075,7 +7075,7 @@ function renderParentSettings() {
     </div>
 
     <div class="card">
-      <div class="card-title">🔇 Not Listening</div>
+      <div class="card-title"><i class="ph-duotone ph-speaker-slash" style="color:#EF4444;font-size:1rem;vertical-align:middle"></i> Not Listening</div>
       <p style="font-size:0.85rem;color:var(--muted);margin-bottom:14px">
         Hold the big red button on the parent dashboard to accumulate time. When you release, seconds convert to point deductions.
       </p>
@@ -7087,16 +7087,16 @@ function renderParentSettings() {
     </div>
 
     <div class="card" style="border:2px solid #1f2937">
-      <div class="card-title" style="color:#1f2937">🔧 Advanced</div>
+      <div class="card-title" style="color:#1f2937"><i class="ph-duotone ph-wrench" style="color:#1f2937;font-size:1rem;vertical-align:middle"></i> Advanced</div>
       <p style="font-size:0.82rem;color:var(--muted);margin-bottom:14px">
         Edit every value in the database directly — member stats, chore diamonds, prize costs, settings, history, and raw JSON.
       </p>
       <button class="btn btn-sm" style="width:100%;background:#1f2937;color:#fff;font-size:0.95rem;padding:12px"
-              onclick="showAdvancedEditor()">🔧 Open Advanced Editor</button>
+              onclick="showAdvancedEditor()"><i class="ph-duotone ph-wrench" style="font-size:1rem;vertical-align:middle"></i> Open Advanced Editor</button>
     </div>
 
     <div class="card" style="border:2px solid #FEE2E2">
-      <div class="card-title" style="color:#EF4444">⚠️ Danger Zone</div>
+      <div class="card-title" style="color:#EF4444"><i class="ph-duotone ph-warning" style="color:#EF4444;font-size:1rem;vertical-align:middle"></i> Danger Zone</div>
       <button class="btn btn-danger btn-sm" onclick="resetAllData()" style="width:100%">Reset All Data</button>
     </div>`;
 
@@ -7125,7 +7125,7 @@ function showAddPointsModal(memberId) {
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="doAdjustPoints('${memberId}')">Apply ✓</button>
+      <button class="btn btn-primary" onclick="doAdjustPoints('${memberId}')">Apply <i class="ph-duotone ph-check" style="font-size:0.95rem;vertical-align:middle"></i></button>
     </div>`);
 }
 
@@ -7222,18 +7222,18 @@ function renderGrandmaToday() {
 
   let html = `
     <div class="card" style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border-radius:18px;margin-bottom:16px">
-      <div style="font-size:1.4rem;font-weight:800;margin-bottom:4px">📅 Today</div>
+      <div style="font-size:1.4rem;font-weight:800;margin-bottom:4px"><i class="ph-duotone ph-calendar-blank" style="color:#fff;vertical-align:middle"></i> Today</div>
       <div style="font-size:1.1rem;opacity:0.9">${todayDisplay()}</div>
     </div>`;
 
   // Today's activities
   if (acts.length > 0) {
-    html += `<div class="card"><div class="card-title" style="font-size:1.3rem">🗓️ Today's Plans</div>`;
+    html += `<div class="card"><div class="card-title" style="font-size:1.3rem"><i class="ph-duotone ph-calendar-blank" style="color:#6C63FF;font-size:1rem;vertical-align:middle"></i> Today's Plans</div>`;
     acts.forEach(a => { html += grandmaActivityCard(a); });
     html += `</div>`;
   } else {
     html += `<div class="card">
-      <div class="card-title" style="font-size:1.3rem">🗓️ Today's Plans</div>
+      <div class="card-title" style="font-size:1.3rem"><i class="ph-duotone ph-calendar-blank" style="color:#6C63FF;font-size:1rem;vertical-align:middle"></i> Today's Plans</div>
       <div style="text-align:center;padding:16px 0;color:var(--muted);font-size:1rem">No plans scheduled today</div>
     </div>`;
   }
@@ -7292,7 +7292,7 @@ function renderGrandmaFamily() {
         </div>`;
 
     if (done.length > 0) {
-      html += `<div style="font-weight:700;margin-bottom:8px;color:var(--green)">✅ Completed today:</div>`;
+      html += `<div style="font-weight:700;margin-bottom:8px;color:var(--green)"><i class="ph-duotone ph-check-circle" style="color:var(--green);vertical-align:middle"></i> Completed today:</div>`;
       done.forEach(c => {
         html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F3F4F6">
           <span style="font-size:1.8rem">${renderIcon(c.icon, c.iconColor, 'font-size:1.8rem')}</span>
@@ -7303,7 +7303,7 @@ function renderGrandmaFamily() {
     }
 
     if (todo.length > 0) {
-      html += `<div style="font-weight:700;margin:10px 0 8px;color:var(--muted)">📋 Still to do:</div>`;
+      html += `<div style="font-weight:700;margin:10px 0 8px;color:var(--muted)"><i class="ph-duotone ph-clipboard-text" style="color:var(--muted);vertical-align:middle"></i> Still to do:</div>`;
       todo.forEach(c => {
         html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F3F4F6;opacity:0.65">
           <span style="font-size:1.8rem">${renderIcon(c.icon, c.iconColor, 'font-size:1.8rem')}</span>
@@ -7321,7 +7321,7 @@ function renderGrandmaFamily() {
     const pct    = Math.min(100,Math.round(total/target*100));
     html += `
       <div class="card" style="background:linear-gradient(135deg,var(--purple),var(--pink));color:#fff;border-radius:18px">
-        <div style="font-size:1.3rem;font-weight:800;margin-bottom:4px">🏆 Team Prize: ${esc(g.title)}</div>
+        <div style="font-size:1.3rem;font-weight:800;margin-bottom:4px"><i class="ph-duotone ph-trophy" style="color:#fff;vertical-align:middle"></i> Team Prize: ${esc(g.title)}</div>
         <div style="margin-bottom:12px;opacity:0.85">${total} of ${target} diamonds saved · ${pct}%</div>
         <div style="background:rgba(255,255,255,0.3);border-radius:999px;height:14px;overflow:hidden">
           <div style="width:${pct}%;height:100%;background:var(--yellow);border-radius:999px;transition:width 0.5s"></div>
@@ -7330,7 +7330,7 @@ function renderGrandmaFamily() {
   });
 
   if (kids.length === 0) {
-    html = `<div class="empty-state"><div class="empty-icon">👶</div><div class="empty-text">No kids in the family yet.</div></div>`;
+    html = `<div class="empty-state"><div class="empty-icon"><i class="ph-duotone ph-smiley" style="color:#9CA3AF;font-size:3rem"></i></div><div class="empty-text">No kids in the family yet.</div></div>`;
   }
 
   document.getElementById('grandma-content').innerHTML = html;
@@ -7343,9 +7343,9 @@ function renderGrandmaPlans() {
     .filter(a=>a.date>=t)
     .sort((a,b)=>a.date.localeCompare(b.date));
 
-  let html = `<div class="card-title" style="font-size:1.3rem">📅 Upcoming Plans</div>`;
+  let html = `<div class="card-title" style="font-size:1.3rem"><i class="ph-duotone ph-calendar-blank" style="color:#6C63FF;font-size:1rem;vertical-align:middle"></i> Upcoming Plans</div>`;
   if (upcoming.length === 0) {
-    html += `<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-text">No upcoming plans yet.</div></div>`;
+    html += `<div class="empty-state"><div class="empty-icon"><i class="ph-duotone ph-calendar-blank" style="color:#9CA3AF;font-size:3rem"></i></div><div class="empty-text">No upcoming plans yet.</div></div>`;
   }
   upcoming.forEach(a => { html += grandmaActivityCard(a); });
   document.getElementById('grandma-content').innerHTML = html;
@@ -7380,7 +7380,7 @@ function showLoading() {
   el.innerHTML = `
     <div style="font-size:3.5rem">💎</div>
     <div style="color:#fff;font-size:1.8rem;font-weight:800">Family Hub</div>
-    <div style="color:rgba(255,255,255,0.8);font-size:1rem">⏳ Loading...</div>`;
+    <div style="color:rgba(255,255,255,0.8);font-size:1rem"><i class="ph-duotone ph-hourglass" style="font-size:1rem;vertical-align:middle"></i> Loading...</div>`;
 }
 
 function routeAfterLoad() {
