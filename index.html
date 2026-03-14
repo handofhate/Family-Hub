@@ -460,20 +460,6 @@
     .tiny-mode .drag-handle { display: none; } /* no reorder handle for little kids */
 
     /* ══════════════════════════════════════════
-       GRANDMA MODE
-    ══════════════════════════════════════════ */
-    .grandma-mode {
-      font-size: 1.35rem;
-    }
-    .grandma-mode .card-title   { font-size: 1.7rem; }
-    .grandma-mode .chore-item   { padding: 18px; }
-    .grandma-mode .chore-name   { font-size: 1.3rem; }
-    .grandma-mode .nav-icon     { font-size: 2.1rem; }
-    .grandma-mode .nav-item     { font-size: 1rem; padding: 12px 8px 18px; }
-    .grandma-mode .btn          { font-size: 1.2rem; padding: 16px 24px; }
-    .grandma-mode input, .grandma-mode select { font-size: 1.2rem; padding: 16px; }
-
-    /* ══════════════════════════════════════════
        PROGRESS BARS
     ══════════════════════════════════════════ */
     .progress-wrap {
@@ -636,32 +622,6 @@
     .history-dmds   { font-weight: 700; font-size: 0.9rem; }
     .history-dmds.pos { color: var(--green); }
     .history-dmds.neg { color: #EF4444; }
-
-    /* ══════════════════════════════════════════
-       ACTIVITY ITEMS
-    ══════════════════════════════════════════ */
-    .activity-item {
-      display: flex;
-      gap: 12px;
-      padding: 13px;
-      background: #F9FAFB;
-      border-radius: 12px;
-      margin-bottom: 9px;
-      align-items: flex-start;
-    }
-    .activity-icon  { font-size: 1.9rem; flex-shrink: 0; }
-    .activity-info  { flex: 1; }
-    .activity-title { font-weight: 700; font-size: 0.95rem; }
-    .activity-meta  { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
-    .activity-who   { margin-top: 4px; display: flex; gap: 4px; flex-wrap: wrap; }
-    .who-chip {
-      background: #EDE9FE;
-      color: var(--purple);
-      font-size: 0.72rem;
-      font-weight: 700;
-      padding: 2px 8px;
-      border-radius: 999px;
-    }
 
     /* ══════════════════════════════════════════
        ADMIN CARDS (parent manage view)
@@ -1158,54 +1118,6 @@
       font-weight:700;
       font-family:inherit;
     }
-    .calendar-grid {
-      display:grid;
-      grid-template-columns:repeat(7, minmax(0, 1fr));
-      gap:8px;
-    }
-    .calendar-dow {
-      text-align:center;
-      color:var(--muted);
-      font-size:0.8rem;
-      font-weight:700;
-      padding:4px 0;
-    }
-    .calendar-day {
-      min-height:120px;
-      background:#fff;
-      border:1px solid var(--border);
-      border-radius:14px;
-      padding:10px;
-      display:flex;
-      flex-direction:column;
-      gap:6px;
-    }
-    .calendar-day.is-today { border-color: var(--purple); box-shadow: 0 0 0 2px rgba(108,99,255,0.15); }
-    .calendar-day.is-other { opacity: 0.45; }
-    .calendar-day-num { font-weight:800; font-size:0.95rem; }
-    .calendar-chip {
-      background:#F5F3FF;
-      border-radius:10px;
-      padding:6px 8px;
-      font-size:0.75rem;
-      font-weight:700;
-      overflow:hidden;
-      text-overflow:ellipsis;
-      white-space:nowrap;
-      cursor:pointer;
-    }
-    .week-grid {
-      display:grid;
-      grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
-      gap:12px;
-    }
-    .week-day-card {
-      background:#fff;
-      border-radius:16px;
-      padding:14px;
-      border:1px solid var(--border);
-    }
-    .week-day-card.is-today { border-color: var(--purple); }
     .overview-kids-grid {
       display:grid;
       grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));
@@ -1618,13 +1530,6 @@
     <nav   class="nav-bar"      id="parent-nav"></nav>
   </div>
 
-  <!-- ═══════════ SCREEN: GRANDMA VIEW ═══════════ -->
-  <div id="screen-grandma" class="screen">
-    <header class="app-header" id="grandma-header"></header>
-    <main  class="main-content grandma-mode" id="grandma-content"></main>
-    <nav   class="nav-bar grandma-mode"      id="grandma-nav"></nav>
-  </div>
-
   <!-- ═══════════ OVERLAYS ═══════════ -->
   <div id="ptr-indicator"></div>
   <div id="modal-root"></div>
@@ -1830,9 +1735,6 @@ let S = {            // UI state (not persisted)
   currentUser:   null,
   kidTab:        'chores',
   parentTab:     'home',
-  grandmaTab:    'today',
-  plansView:     'month',
-  plansCursor:   '',
   setupStep:     0,
   setupMembers:  [],   // unified non-parent members during setup
   pinBuffer:     '',
@@ -1867,7 +1769,6 @@ function defaultData() {
     chores:     [],
     prizes:     [],
     teamGoals:  [],
-    activities: [],
     history:    [],
   };
 }
@@ -2183,7 +2084,6 @@ function normalizeData(data) {
   normalized.prizes = Array.isArray(normalized.prizes)
     ? normalized.prizes.map(p => ({ icon:'gift', iconColor:'#FF6584', ...p }))
     : [];
-  normalized.activities = Array.isArray(normalized.activities) ? normalized.activities : [];
   normalized.history = Array.isArray(normalized.history) ? normalized.history : [];
   // Migrate old familyGoal → teamGoals[0]
   if (!normalized.teamGoals) {
@@ -3551,7 +3451,6 @@ function renderCurrentView() {
   if (!S.currentUser) return;
   const u = S.currentUser;
   if (u.role === 'parent')  renderParentView();
-  else if (u.role === 'viewer') renderGrandmaView();
   else renderKidView();
 }
 
@@ -3658,13 +3557,11 @@ function renderHome() {
   const members = D.family.members;
   const cards = members.map(m => {
     const bday    = isBirthday(m);
-    const mode    = m.displayMode || (m.role === 'viewer' ? 'elder' : 'regular');
+    const mode    = m.displayMode || 'regular';
     const modeLabel = m.role === 'parent' ? 'Parent'
-                    : mode === 'elder'    ? 'Elder'
                     : mode === 'tiny'     ? 'Little Kid'
                     : 'Kid';
     const ptsLabel = m.role === 'parent' ? '<i class="ph-duotone ph-gear-six" style="color:#fff;font-size:0.9rem;vertical-align:middle"></i> Admin'
-                   : mode === 'elder'    ? '<i class="ph-duotone ph-eye" style="color:#fff;font-size:0.9rem;vertical-align:middle"></i> View'
                    : `💎 ${m.diamonds||0} 💎`;
     return `
       <button class="profile-card${bday?' bday-card':''}" style="--member-color:${m.color||'#6C63FF'};position:relative"
@@ -3728,8 +3625,6 @@ function routeToView(member) {
   const mode = member.displayMode;
   if (member.role === 'parent') {
     renderParentView();
-  } else if (mode === 'elder' || member.role === 'viewer') {
-    renderGrandmaView();
   } else {
     renderKidView(); // handles both 'tiny' and 'regular'
   }
@@ -3927,7 +3822,7 @@ function renderSetupStep() {
       <div class="setup-top" style="padding-top:20px">
         <div class="setup-emoji"><i class="ph-duotone ph-users-three" style="color:#6C63FF;font-size:3rem"></i></div>
         <div class="setup-title">Family Members</div>
-        <div class="setup-sub">Add anyone who will use the app — kids, elders, anyone!</div>
+        <div class="setup-sub">Add the kids who will use the app.</div>
       </div>
       <div id="members-list">${S.setupMembers.map((m,i)=>memberSetupCard(m,i)).join('')}</div>
       <button class="btn btn-secondary btn-full mt-8" onclick="addMemberCard()" style="margin-bottom:14px">+ Add a family member</button>
@@ -4041,7 +3936,6 @@ function memberSetupCard(mem, i) {
   const modes = [
     { id:'tiny',    icon:'<i class="ph-duotone ph-star" style="color:#F97316;font-size:1.1rem"></i>', label:'Little Kid',  sub:'Big icons + voice' },
     { id:'regular', icon:'<i class="ph-duotone ph-user" style="color:#6C63FF;font-size:1.1rem"></i>', label:'Big Kid',     sub:'Standard view' },
-    { id:'elder',   icon:'<i class="ph-duotone ph-users" style="color:#0F766E;font-size:1.1rem"></i>', label:'Elder',       sub:'Large text, simple' },
   ];
   const modeOpts = modes.map(m =>
     `<div class="mode-opt${dm===m.id?' sel':''}" onclick="setMemberField(${i},'displayMode','${m.id}',true)">
@@ -4146,7 +4040,7 @@ function setupNext() {
   }
 
   if (stepName === 'chores') {
-    const kidMembers = S.setupMembers.filter(m=>m.displayMode!=='elder');
+    const kidMembers = S.setupMembers;
     DEFAULT_CHORES.forEach((c,i) => {
       const cb = document.getElementById('sc'+i);
       if (cb && cb.checked && !D.chores.find(x=>x.title===c.title)) {
@@ -4203,14 +4097,14 @@ function finishSetup() {
   // Derive role from displayMode, preserve existing diamonds/savings
   const mergedMembers = S.setupMembers.map(m => {
     const existing = D.family.members.find(x=>x.id===m.id) || {};
-    const role = m.displayMode === 'elder' ? 'viewer' : 'kid';
+    const role = 'kid';
     return { ...existing, ...m, role };
   });
 
   D.family.members = [parent, ...mergedMembers];
 
-  // Assign orphaned chores to all non-elder members
-  const kidIds = mergedMembers.filter(m=>m.role==='kid').map(m=>m.id);
+  // Assign orphaned chores to all kid members
+  const kidIds = mergedMembers.map(m=>m.id);
   D.chores.forEach(c => {
     if (!c.assignedTo || c.assignedTo.length === 0) c.assignedTo = kidIds;
   });
@@ -5099,7 +4993,6 @@ function renderParentNav() {
     ['home',    ICONS.home,     'Overview'],
     ['chores',  ICONS.chores,   'Chores'],
     ['prizes',  ICONS.prizes,   'Prizes'],
-    ['plans',   ICONS.plans,    'Plans'],
     ['stats',   ICONS.stats,    'Stats'],
     ['settings',ICONS.settings, 'Settings'],
   ];
@@ -5121,7 +5014,6 @@ function renderParentTab() {
     case 'home':     renderParentHome();     break;
     case 'chores':   renderParentChores();   break;
     case 'prizes':   renderParentPrizes();   break;
-    case 'plans':    renderParentPlans();    break;
     case 'stats':    renderStatsPage(document.getElementById('parent-content')); break;
     case 'settings': renderParentSettings(); break;
   }
@@ -5513,14 +5405,6 @@ function renderParentHome() {
   });
   html += `<div class="card"><div class="card-title"><i class="ph-duotone ph-users-three" style="color:#6C63FF;font-size:1rem;vertical-align:middle"></i> Kids Today</div>${kids.length>0?`<div class="overview-kids-grid">${kidsHtml}</div>`:kidsHtml}</div>`;
 
-  // Today's activities
-  const todayActivities = D.activities.filter(a=>a.date===t);
-  if (todayActivities.length > 0) {
-    html += `<div class="card"><div class="card-title"><i class="ph-duotone ph-calendar-blank" style="color:#6C63FF;font-size:1rem;vertical-align:middle"></i> Today's Plans</div>`;
-    todayActivities.forEach(a => { html += activityCard(a); });
-    html += `</div>`;
-  }
-
   // Quick actions
   html += `
     <div class="card">
@@ -5529,7 +5413,6 @@ function renderParentHome() {
         <button class="btn btn-primary btn-sm" onclick="showChoreModal()">+ Add Chore</button>
         <button class="btn btn-pink   btn-sm" onclick="showPrizeModal()">+ Add Prize</button>
         <button class="btn btn-teal   btn-sm" onclick="showGoalModal()"><i class="ph-duotone ph-target" style="font-size:1rem;vertical-align:middle"></i> Set Goal</button>
-        <button class="btn btn-warning btn-sm" onclick="showActivityModal()">+ Plan Event</button>
         <button class="btn btn-danger  btn-sm" style="grid-column:span 2;background:#EF4444;color:#fff;font-size:1rem;padding:14px"
                 onclick="showNotListening()"><i class="ph-duotone ph-speaker-slash" style="font-size:1.1rem;vertical-align:middle"></i> You're Not Listening</button>
       </div>
@@ -6439,262 +6322,6 @@ function clearGoal(goalId) {
   renderParentPrizes();
 }
 
-// ── PARENT PLANS (ACTIVITIES) ─────────────────────────────────
-function getParentPlansCursor() {
-  if (!S.plansCursor) S.plansCursor = today();
-  return S.plansCursor;
-}
-
-function setParentPlansView(view) {
-  S.plansView = view;
-  if (!S.plansCursor) S.plansCursor = today();
-  renderParentPlans();
-}
-
-function setParentPlansCursor(dateStr, view) {
-  S.plansCursor = dateStr;
-  if (view) S.plansView = view;
-  renderParentPlans();
-}
-
-function shiftParentPlans(direction) {
-  const cursor = getParentPlansCursor();
-  if (S.plansView === 'day') {
-    S.plansCursor = addDaysToDate(cursor, direction);
-  } else if (S.plansView === 'week') {
-    S.plansCursor = addDaysToDate(cursor, direction * 7);
-  } else {
-    S.plansCursor = addMonthsToDate(cursor, direction);
-  }
-  renderParentPlans();
-}
-
-function parentPlansLabel() {
-  const cursor = parseDateLocal(getParentPlansCursor());
-  if (S.plansView === 'day') {
-    return cursor.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
-  }
-  if (S.plansView === 'week') {
-    const start = parseDateLocal(startOfWeekDate(getParentPlansCursor()));
-    const end = parseDateLocal(addDaysToDate(formatDateLocal(start), 6));
-    return `${start.toLocaleDateString('en-US', { month:'short', day:'numeric' })} - ${end.toLocaleDateString('en-US', { month:'short', day:'numeric' })}`;
-  }
-  return cursor.toLocaleDateString('en-US', { month:'long', year:'numeric' });
-}
-
-function renderPlanActivityCard(a, faded) {
-  return `
-    <div class="admin-card"${faded?' style="opacity:0.6"':''}>
-      ${activityCard(a)}
-      <div class="admin-actions" style="margin-left:auto;align-self:flex-start">
-        <button class="btn-icon-sm btn-icon-edit" onclick="showActivityModal('${a.id}')"><i class="ph-duotone ph-pencil-simple" style="color:#374151;font-size:1rem"></i></button>
-        <button class="btn-icon-sm btn-icon-delete" onclick="deleteActivity('${a.id}')"><i class="ph-duotone ph-trash" style="color:#EF4444;font-size:1rem"></i></button>
-      </div>
-    </div>`;
-}
-
-function renderParentPlansMonth(cursor) {
-  const current = parseDateLocal(cursor);
-  const monthStart = new Date(current.getFullYear(), current.getMonth(), 1);
-  const monthEnd = new Date(current.getFullYear(), current.getMonth() + 1, 0);
-  const gridStart = parseDateLocal(startOfWeekDate(formatDateLocal(monthStart)));
-  const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-  let html = `<div class="calendar-grid">${dayNames.map(name => `<div class="calendar-dow">${name}</div>`).join('')}`;
-
-  for (let index = 0; index < 42; index += 1) {
-    const cellDate = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + index);
-    const cellKey = formatDateLocal(cellDate);
-    const activities = D.activities
-      .filter(a=>a.date===cellKey)
-      .sort((a,b)=>(a.time||'').localeCompare(b.time||''));
-    const isOtherMonth = cellDate < monthStart || cellDate > monthEnd;
-    const isToday = cellKey === today();
-    html += `
-      <button class="calendar-day${isOtherMonth?' is-other':''}${isToday?' is-today':''}" onclick="setParentPlansCursor('${cellKey}','day')">
-        <div class="calendar-day-num">${cellDate.getDate()}</div>
-        ${activities.slice(0,3).map(a => `<div class="calendar-chip">${a.icon||'📅'} ${esc(a.title)}</div>`).join('')}
-        ${activities.length>3?`<div class="calendar-chip">+${activities.length-3} more</div>`:''}
-      </button>`;
-  }
-
-  html += `</div>`;
-  return html;
-}
-
-function renderParentPlansWeek(cursor) {
-  const weekStart = parseDateLocal(startOfWeekDate(cursor));
-  let html = `<div class="week-grid">`;
-  for (let offset = 0; offset < 7; offset += 1) {
-    const date = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + offset);
-    const dateKey = formatDateLocal(date);
-    const activities = D.activities
-      .filter(a=>a.date===dateKey)
-      .sort((a,b)=>(a.time||'').localeCompare(b.time||''));
-    html += `
-      <div class="week-day-card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-          <div>
-            <div style="font-weight:800">${date.toLocaleDateString('en-US', { weekday:'long' })}</div>
-            <div style="font-size:0.85rem;color:var(--muted)">${date.toLocaleDateString('en-US', { month:'short', day:'numeric' })}</div>
-          </div>
-          <button class="btn btn-secondary btn-sm" onclick="setParentPlansCursor('${dateKey}','day')">Open</button>
-        </div>
-        ${activities.length ? activities.map(a => activityCard(a)).join('') : `<div class="empty-state" style="padding:18px 10px"><div class="empty-text">Nothing planned</div></div>`}
-      </div>`;
-  }
-  html += `</div>`;
-  return html;
-}
-
-function renderParentPlansDay(cursor) {
-  const activities = D.activities
-    .filter(a=>a.date===cursor)
-    .sort((a,b)=>(a.time||'').localeCompare(b.time||''));
-  if (!activities.length) {
-    return `<div class="empty-state"><div class="empty-icon"><i class="ph-duotone ph-calendar-blank" style="color:#9CA3AF;font-size:3rem"></i></div><div class="empty-text">Nothing planned for this day.</div></div>`;
-  }
-  return activities.map(a => renderPlanActivityCard(a, false)).join('');
-}
-
-function renderParentPlans() {
-  const t = today();
-  const cursor = getParentPlansCursor();
-  const past = D.activities
-    .filter(a=>a.date<t)
-    .sort((a,b)=>b.date.localeCompare(a.date))
-    .slice(0,5);
-
-  let html = `
-    <div class="section-row">
-      <span class="section-title"><i class="ph-duotone ph-calendar-blank" style="color:#6C63FF;font-size:1rem;vertical-align:middle"></i> Plans & Activities</span>
-      <button class="btn btn-primary btn-sm" onclick="showActivityModal()">+ Add</button>
-    </div>
-    <div class="schedule-toolbar">
-      <div class="schedule-controls">
-        <button class="schedule-nav-btn" onclick="shiftParentPlans(-1)">‹</button>
-        <div class="schedule-label">${parentPlansLabel()}</div>
-        <button class="schedule-nav-btn" onclick="shiftParentPlans(1)">›</button>
-      </div>
-      <div class="display-mode-row" style="margin-top:0">
-        <button class="mode-opt${S.plansView==='day'?' sel':''}" onclick="setParentPlansView('day')"><span class="mode-opt-icon"><i class="ph-duotone ph-sun" style="font-size:1.1rem"></i></span>Day</button>
-        <button class="mode-opt${S.plansView==='week'?' sel':''}" onclick="setParentPlansView('week')"><span class="mode-opt-icon"><i class="ph-duotone ph-calendar-blank" style="font-size:1.1rem"></i></span>Week</button>
-        <button class="mode-opt${S.plansView==='month'?' sel':''}" onclick="setParentPlansView('month')"><span class="mode-opt-icon"><i class="ph-duotone ph-calendar-dots" style="font-size:1.1rem"></i></span>Month</button>
-      </div>
-    </div>`;
-
-  if (S.plansView === 'day') {
-    html += renderParentPlansDay(cursor);
-  } else if (S.plansView === 'week') {
-    html += renderParentPlansWeek(cursor);
-  } else {
-    html += renderParentPlansMonth(cursor);
-  }
-
-  if (past.length > 0) {
-    html += `<div class="divider"></div><div class="section-title" style="margin-bottom:10px;color:var(--muted)">Past Events</div>`;
-    past.forEach(a => { html += renderPlanActivityCard(a, true); });
-  }
-
-  document.getElementById('parent-content').innerHTML = html;
-}
-
-function activityCard(a) {
-  const members = D.family.members;
-  const whoChips = (a.who||[]).map(id=>{
-    const m = getMember(id);
-    return m ? `<span class="who-chip">${m.avatar} ${esc(m.name)}</span>` : '';
-  }).join('');
-  return `
-    <div class="activity-item">
-      <span class="activity-icon">${a.icon||'📅'}</span>
-      <div class="activity-info">
-        <div class="activity-title">${esc(a.title)}</div>
-        <div class="activity-meta">${fmtDate(a.date)}${a.time?' · '+a.time:''}</div>
-        ${whoChips?`<div class="activity-who">${whoChips}</div>`:''}
-        ${a.notes?`<div style="font-size:0.8rem;color:var(--muted);margin-top:4px">${esc(a.notes)}</div>`:''}
-      </div>
-    </div>`;
-}
-
-function showActivityModal(actId) {
-  const act  = actId ? D.activities.find(a=>a.id===actId) : null;
-  const a    = act || { title:'', icon:'📅', date:today(), time:'', who:[], notes:'' };
-  const members = D.family.members.filter(m=>m.role!=='parent');
-  const iconOpts = ['📅','⚽','🎨','🏊','🎪','🏖️','🎠','🎬','🍕','🎁','🎤','🎯','🚗','✈️','🏕️'].map(ic =>
-    `<div class="icon-opt${ic===a.icon?' sel':''}" onclick="selActIcon(this,'${ic}')">${ic}</div>`
-  ).join('');
-  const whoOpts = members.map(m => `
-    <label class="chore-checkbox-row">
-      <input type="checkbox" name="act-who" value="${m.id}" ${a.who?.includes(m.id)?'checked':''}>
-      <span class="chore-checkbox-icon">${m.avatar}</span>
-      <span class="chore-checkbox-label">${esc(m.name)}</span>
-    </label>`).join('');
-
-  showModal(`
-    <div class="modal-title">${act?'Edit':'Add'} Event</div>
-    <input type="hidden" id="am-icon" value="${a.icon||'📅'}">
-    <div class="form-group">
-      <label class="form-label">Icon</label>
-      <div class="icon-picker" style="grid-template-columns:repeat(7,1fr)">${iconOpts}</div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Event name</label>
-      <input type="text" id="am-title" placeholder="e.g. Soccer Practice" value="${esc(a.title)}">
-    </div>
-    <div class="input-row">
-      <div class="form-group mb-0">
-        <label class="form-label">Date</label>
-        <input type="date" id="am-date" value="${a.date}">
-      </div>
-      <div class="form-group mb-0">
-        <label class="form-label">Time <span class="form-label-hint">optional</span></label>
-        <input type="time" id="am-time" value="${a.time||''}">
-      </div>
-    </div>
-    ${members.length>0?`<div class="form-group"><label class="form-label">Who's going?</label>${whoOpts}</div>`:''}
-    <div class="form-group">
-      <label class="form-label">Notes <span class="form-label-hint">optional</span></label>
-      <textarea id="am-notes" placeholder="Bring snacks, location, etc.">${esc(a.notes||'')}</textarea>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveActivity('${actId||''}')">Save <i class="ph-duotone ph-check" style="font-size:0.95rem;vertical-align:middle"></i></button>
-    </div>`);
-}
-
-function selActIcon(el, icon) {
-  document.getElementById('am-icon').value = icon;
-  el.closest('.icon-picker').querySelectorAll('.icon-opt').forEach(x=>x.classList.remove('sel'));
-  el.classList.add('sel');
-}
-
-function saveActivity(actId) {
-  const title = document.getElementById('am-title')?.value.trim();
-  const icon  = document.getElementById('am-icon')?.value  || '📅';
-  const date  = document.getElementById('am-date')?.value  || today();
-  const time  = document.getElementById('am-time')?.value  || '';
-  const notes = document.getElementById('am-notes')?.value.trim();
-  const who   = [...document.querySelectorAll('input[name=act-who]:checked')].map(x=>x.value);
-  if (!title) { toast('Enter an event name'); return; }
-
-  if (actId) {
-    const a = D.activities.find(x=>x.id===actId);
-    if (a) Object.assign(a, { title, icon, date, time, who, notes });
-  } else {
-    D.activities.push({ id:genId(), title, icon, date, time, who, notes });
-  }
-  saveData();
-  closeModal();
-  toast(actId?'Event updated!':'Event added!');
-  renderParentPlans();
-}
-
-function deleteActivity(actId) {
-  if (!confirm('Delete this event?')) return;
-  D.activities = D.activities.filter(a=>a.id!==actId);
-  saveData();
-  renderParentPlans();
-}
 
 // ── ADVANCED DATA EDITOR ──────────────────────────────────────
 function showAdvancedEditor() {
@@ -6830,7 +6457,7 @@ function _advRender() {
       _advField('Age',          _advInput('number', m.age||'',         `advSetMember('${m.id}','age',+this.value)`)),
       _advField('Color',        _advInput('color',  m.color||'#6C63FF',`advSetMember('${m.id}','color',this.value)`)),
       _advField('Role',         `<select class="adv-field-input" onchange="advSetMember('${m.id}','role',this.value)">
-        ${['parent','kid','viewer'].map(r=>`<option value="${r}" ${m.role===r?'selected':''}>${r}</option>`).join('')}
+        ${['parent','kid'].map(r=>`<option value="${r}" ${m.role===r?'selected':''}>${r}</option>`).join('')}
       </select>`),
       _advField('Diamonds 💎',    _advInput('number', m.diamonds||0,       `advSetMember('${m.id}','diamonds',+this.value)`)),
       _advField('Total Earned', _advInput('number', m.totalEarned||0,  `advSetMember('${m.id}','totalEarned',+this.value)`)),
@@ -7216,222 +6843,6 @@ function resetAllData() {
   db.doc(FAMILY_DOC).delete().catch(e => console.warn('Firestore delete error:', e));
   D = defaultData();
   location.reload();
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   CHUNK 6 — GRANDMA VIEW + INIT + BOOTSTRAP
-═══════════════════════════════════════════════════════════════ */
-
-// ── GRANDMA VIEW ENTRY ────────────────────────────────────────
-function renderGrandmaView() {
-  const m = S.currentUser;
-  showScreen('screen-grandma');
-  // Apply large-font base to grandma screens
-  document.getElementById('grandma-content').style.fontSize = '1.15rem';
-
-  renderGrandmaHeader();
-  renderGrandmaNav();
-  renderGrandmaTab();
-}
-
-function renderGrandmaHeader() {
-  const m = S.currentUser;
-  document.getElementById('grandma-header').innerHTML = `
-    <div class="header-left">
-      <button class="btn-back" onclick="goHome()">←</button>
-      <span class="header-avatar">${m?.avatar||'👵'}</span>
-      <div>
-        <div class="header-name">${esc(m?.name||'Grandma')}</div>
-        <div class="header-sub">${todayDisplay()}</div>
-      </div>
-    </div>
-    <div class="header-actions">
-      <button class="btn-icon-sm" style="background:#F3F4F6" onclick="openUserSettings()" title="Settings"><i class="ph-duotone ph-gear-six" style="color:#6C63FF;font-size:1.15rem"></i></button>
-    </div>`;
-}
-
-function renderGrandmaNav() {
-  const tabs = [
-    ['today', ICONS.today,  'Today'],
-    ['family',ICONS.family, 'Family'],
-    ['plans', ICONS.plans,  'Plans'],
-    ['stats', ICONS.stats,  'Stats'],
-  ];
-  document.getElementById('grandma-nav').innerHTML = tabs.map(([id,icon,label]) => `
-    <button class="nav-item${S.grandmaTab===id?' active':''}" onclick="switchGrandmaTab('${id}')">
-      <span class="nav-icon" style="font-size:1.8rem">${icon}</span>
-      <span style="font-size:0.85rem;font-weight:700">${label}</span>
-    </button>`).join('');
-}
-
-function switchGrandmaTab(tab) {
-  S.grandmaTab = tab;
-  renderGrandmaNav();
-  renderGrandmaTab();
-}
-
-function renderGrandmaTab() {
-  switch(S.grandmaTab) {
-    case 'today':  renderGrandmaToday();  break;
-    case 'family': renderGrandmaFamily(); break;
-    case 'plans':  renderGrandmaPlans();  break;
-    case 'stats':  renderStatsPage(document.getElementById('grandma-content')); break;
-  }
-}
-
-// ── GRANDMA: TODAY ────────────────────────────────────────────
-function renderGrandmaToday() {
-  const t    = today();
-  const acts = D.activities.filter(a=>a.date===t);
-  const kids = D.family.members.filter(m=>m.role==='kid');
-
-  let html = `
-    <div class="card" style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border-radius:18px;margin-bottom:16px">
-      <div style="font-size:1.4rem;font-weight:800;margin-bottom:4px"><i class="ph-duotone ph-calendar-blank" style="color:#fff;vertical-align:middle"></i> Today</div>
-      <div style="font-size:1.1rem;opacity:0.9">${todayDisplay()}</div>
-    </div>`;
-
-  // Today's activities
-  if (acts.length > 0) {
-    html += `<div class="card"><div class="card-title" style="font-size:1.3rem"><i class="ph-duotone ph-calendar-blank" style="color:#6C63FF;font-size:1rem;vertical-align:middle"></i> Today's Plans</div>`;
-    acts.forEach(a => { html += grandmaActivityCard(a); });
-    html += `</div>`;
-  } else {
-    html += `<div class="card">
-      <div class="card-title" style="font-size:1.3rem"><i class="ph-duotone ph-calendar-blank" style="color:#6C63FF;font-size:1rem;vertical-align:middle"></i> Today's Plans</div>
-      <div style="text-align:center;padding:16px 0;color:var(--muted);font-size:1rem">No plans scheduled today</div>
-    </div>`;
-  }
-
-  // Kids chore summary
-  html += `<div class="card"><div class="card-title" style="font-size:1.3rem">💎 Kids' Chores Today</div>`;
-  if (kids.length === 0) {
-    html += `<div style="color:var(--muted)">No kids in the family yet.</div>`;
-  }
-  kids.forEach(kid => {
-    const myChores  = D.chores.filter(c=>c.assignedTo?.includes(kid.id));
-    const doneCount = myChores.filter(c=>choreStatus(c,kid.id)==='done').length;
-    const pct       = myChores.length>0 ? Math.round(doneCount/myChores.length*100) : 0;
-    html += `
-      <div style="margin-bottom:18px">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
-          <span style="font-size:2.2rem">${kid.avatar||'🙂'}</span>
-          <div>
-            <div style="font-size:1.3rem;font-weight:700">${esc(kid.name)}</div>
-            <div style="color:var(--muted)">${doneCount} of ${myChores.length} chores done · 💎 ${kid.diamonds||0} diamonds</div>
-          </div>
-        </div>
-        <div class="progress-wrap" style="height:14px">
-          <div class="progress-fill" style="width:${pct}%;background:${kid.color||'var(--purple)'}"></div>
-        </div>
-        <div style="text-align:right;font-size:0.9rem;color:var(--muted);margin-top:4px">${pct}%</div>
-      </div>`;
-  });
-  html += `</div>`;
-
-  document.getElementById('grandma-content').innerHTML = html;
-}
-
-// ── GRANDMA: FAMILY ───────────────────────────────────────────
-function renderGrandmaFamily() {
-  const kids = D.family.members.filter(m=>m.role==='kid');
-  let html = '';
-
-  kids.forEach(kid => {
-    const myChores = D.chores.filter(c=>c.assignedTo?.includes(kid.id));
-    const done     = myChores.filter(c=>choreStatus(c,kid.id)==='done');
-    const todo     = myChores.filter(c=>choreStatus(c,kid.id)==='none');
-
-    html += `
-      <div class="card" style="border-top:5px solid ${kid.color||'#6C63FF'}">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
-          <span style="font-size:3rem">${kid.avatar||'🙂'}</span>
-          <div>
-            <div style="font-size:1.4rem;font-weight:800">${esc(kid.name)}</div>
-            <div style="color:var(--muted)">Age ${kid.age||'?'}</div>
-          </div>
-          <div style="margin-left:auto;text-align:right">
-            <div style="font-size:2rem;font-weight:800;color:${kid.color||'var(--purple)'}">💎 ${kid.diamonds||0}</div>
-            <div style="font-size:0.85rem;color:var(--muted)">diamonds</div>
-          </div>
-        </div>`;
-
-    if (done.length > 0) {
-      html += `<div style="font-weight:700;margin-bottom:8px;color:var(--green)"><i class="ph-duotone ph-check-circle" style="color:var(--green);vertical-align:middle"></i> Completed today:</div>`;
-      done.forEach(c => {
-        html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F3F4F6">
-          <span style="font-size:1.8rem">${renderIcon(c.icon, c.iconColor, 'font-size:1.8rem')}</span>
-          <span style="font-size:1.1rem">${esc(c.title)}</span>
-          <span style="margin-left:auto;color:var(--green);font-weight:700">+${c.diamonds}</span>
-        </div>`;
-      });
-    }
-
-    if (todo.length > 0) {
-      html += `<div style="font-weight:700;margin:10px 0 8px;color:var(--muted)"><i class="ph-duotone ph-clipboard-text" style="color:var(--muted);vertical-align:middle"></i> Still to do:</div>`;
-      todo.forEach(c => {
-        html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F3F4F6;opacity:0.65">
-          <span style="font-size:1.8rem">${renderIcon(c.icon, c.iconColor, 'font-size:1.8rem')}</span>
-          <span style="font-size:1.1rem">${esc(c.title)}</span>
-        </div>`;
-      });
-    }
-    html += `</div>`;
-  });
-
-  // Team goals
-  (D.teamGoals||[]).forEach(g => {
-    const total  = goalTotal(g);
-    const target = g.targetPoints||1;
-    const pct    = Math.min(100,Math.round(total/target*100));
-    html += `
-      <div class="card" style="background:linear-gradient(135deg,var(--purple),var(--pink));color:#fff;border-radius:18px">
-        <div style="font-size:1.3rem;font-weight:800;margin-bottom:4px"><i class="ph-duotone ph-trophy" style="color:#fff;vertical-align:middle"></i> Team Prize: ${esc(g.title)}</div>
-        <div style="margin-bottom:12px;opacity:0.85">${total} of ${target} diamonds saved · ${pct}%</div>
-        <div style="background:rgba(255,255,255,0.3);border-radius:999px;height:14px;overflow:hidden">
-          <div style="width:${pct}%;height:100%;background:var(--yellow);border-radius:999px;transition:width 0.5s"></div>
-        </div>
-      </div>`;
-  });
-
-  if (kids.length === 0) {
-    html = `<div class="empty-state"><div class="empty-icon"><i class="ph-duotone ph-smiley" style="color:#9CA3AF;font-size:3rem"></i></div><div class="empty-text">No kids in the family yet.</div></div>`;
-  }
-
-  document.getElementById('grandma-content').innerHTML = html;
-}
-
-// ── GRANDMA: PLANS ────────────────────────────────────────────
-function renderGrandmaPlans() {
-  const t  = today();
-  const upcoming = D.activities
-    .filter(a=>a.date>=t)
-    .sort((a,b)=>a.date.localeCompare(b.date));
-
-  let html = `<div class="card-title" style="font-size:1.3rem"><i class="ph-duotone ph-calendar-blank" style="color:#6C63FF;font-size:1rem;vertical-align:middle"></i> Upcoming Plans</div>`;
-  if (upcoming.length === 0) {
-    html += `<div class="empty-state"><div class="empty-icon"><i class="ph-duotone ph-calendar-blank" style="color:#9CA3AF;font-size:3rem"></i></div><div class="empty-text">No upcoming plans yet.</div></div>`;
-  }
-  upcoming.forEach(a => { html += grandmaActivityCard(a); });
-  document.getElementById('grandma-content').innerHTML = html;
-}
-
-function grandmaActivityCard(a) {
-  const members = D.family.members;
-  const whoText = (a.who||[]).map(id=>{
-    const m = getMember(id);
-    return m ? `${m.avatar} ${m.name}` : '';
-  }).filter(Boolean).join(', ');
-  return `
-    <div style="display:flex;gap:14px;padding:16px;background:#F9FAFB;border-radius:14px;margin-bottom:12px;align-items:flex-start">
-      <span style="font-size:2.5rem;flex-shrink:0">${a.icon||'📅'}</span>
-      <div>
-        <div style="font-size:1.2rem;font-weight:700">${esc(a.title)}</div>
-        <div style="color:var(--muted);margin-top:4px">${fmtDate(a.date)}${a.time?' at '+a.time:''}</div>
-        ${whoText?`<div style="margin-top:6px">${whoText}</div>`:''}
-        ${a.notes?`<div style="margin-top:6px;color:var(--muted)">${esc(a.notes)}</div>`:''}
-      </div>
-    </div>`;
 }
 
 /* ═══════════════════════════════════════════════════════════════
