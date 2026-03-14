@@ -1914,6 +1914,10 @@ function subscribeToFirestore(onFirstLoad) {
 }
 
 // ── UTILITIES ─────────────────────────────────────────────────
+function todayDisplay() {
+  return new Date().toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+}
+
 function genId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 }
@@ -2681,7 +2685,7 @@ function dateDiffDays(dateStr1, dateStr2) {
   return Math.round((d2 - d1) / 86400000);
 }
 
-// ── Split Household helpers ────────────────────────────────────────────────
+// ── SPLIT HOUSEHOLD HELPERS ───────────────────────────────────────────────
 
 function getMostRecentMonday() {
   const d = new Date();
@@ -2757,7 +2761,7 @@ function runHereCheck() {
   }
 }
 
-// ── Split Household Modal ─────────────────────────────────────────────────
+// ── SPLIT HOUSEHOLD MODAL ─────────────────────────────────────────────────
 
 const DAY_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
@@ -2925,7 +2929,7 @@ function saveSplitHousehold() {
   renderSettings();
 }
 
-// ── Here-Check Modal (6 pm prompt) ────────────────────────────────────────
+// ── HERE-CHECK MODAL (6 PM PROMPT) ───────────────────────────────────────
 
 function showHereCheckModal(members) {
   const rows = members.map(m => `
@@ -5087,7 +5091,7 @@ function viewPhoto(url) {
     </div>`);
 }
 
-// ── POINTS TAB (8yo) ──────────────────────────────────────────
+// ── KID DIAMONDS TAB ──────────────────────────────────────────
 function renderKidDiamonds() {
   const m   = S.currentUser;
   const dmds = m.diamonds || 0;
@@ -5531,11 +5535,6 @@ function doContrib(memberId, goalId) {
   if (isTiny(m)) speak(`You gave ${dmds} diamonds to the team! Amazing!`);
   renderKidTeam();
   renderKidHeader();
-}
-
-// ── HELPERS ───────────────────────────────────────────────────
-function todayDisplay() {
-  return new Date().toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
 }
 
 /* ═══════════════════════════════════════════════════════════════
