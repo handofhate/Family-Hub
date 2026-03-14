@@ -3783,9 +3783,12 @@ function tryBiometricUnlock() {
 }
 
 // ── SETUP WIZARD ──────────────────────────────────────────────
-const SETUP_STEPS = ['welcome','members','chores','prizes','sync','done'];
+const SETUP_STEPS_NEW  = ['welcome','members','chores','prizes','sync','done'];
+const SETUP_STEPS_EDIT = ['welcome','members','sync','done'];
+let SETUP_STEPS = SETUP_STEPS_NEW;
 
 function goSetup() {
+  SETUP_STEPS    = D.setup ? SETUP_STEPS_EDIT : SETUP_STEPS_NEW;
   S.setupStep    = 0;
   // All non-parent members in one unified list
   S.setupMembers = D.family.members
