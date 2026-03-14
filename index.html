@@ -1623,11 +1623,15 @@ function showAppPin() {
   }
 }
 
-// ── SWITCH USER (requires PIN) ────────────────────────────────
+// ── SWITCH USER ───────────────────────────────────────────────
 function goHome() {
+  const wasParent = S.currentUser?.role === 'parent';
   S.currentUser = null;
   setCurrentUserId('');
-  showAppPin();
+  // Parent is already authenticated — go straight to profile picker.
+  // Kids still require PIN to get back to the picker (protects parent profile).
+  if (wasParent) renderHome();
+  else showAppPin();
 }
 
 /* ═══════════════════════════════════════════════════════════════
