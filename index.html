@@ -3807,11 +3807,47 @@ function showModal(html) {
   const root = document.getElementById('modal-root');
   root.innerHTML = `
     <div class="modal-overlay" id="modal-overlay" onclick="closeModalIfBg(event)">
-      <div class="modal">
-        <div class="modal-handle"></div>
+      <div class="modal" id="modal-sheet">
+        <div class="modal-handle" id="modal-drag-handle"></div>
         ${html}
       </div>
     </div>`;
+  _initModalSwipe();
+}
+
+function _initModalSwipe() {
+  const sheet  = document.getElementById('modal-sheet');
+  const handle = document.getElementById('modal-drag-handle');
+  if (!sheet) return;
+  let startY = 0, currentY = 0, dragging = false;
+  const onStart = (e) => {
+    startY   = e.touches ? e.touches[0].clientY : e.clientY;
+    currentY = startY;
+    dragging = true;
+    sheet.style.transition = 'none';
+  };
+  const onMove = (e) => {
+    if (!dragging) return;
+    currentY = e.touches ? e.touches[0].clientY : e.clientY;
+    const dy = Math.max(0, currentY - startY);
+    sheet.style.transform = `translateY(${dy}px)`;
+  };
+  const onEnd = () => {
+    if (!dragging) return;
+    dragging = false;
+    const dy = Math.max(0, currentY - startY);
+    if (dy > 100) {
+      sheet.style.transition = 'transform 0.22s ease';
+      sheet.style.transform  = 'translateY(110%)';
+      setTimeout(closeModal, 220);
+    } else {
+      sheet.style.transition = 'transform 0.22s ease';
+      sheet.style.transform  = '';
+    }
+  };
+  sheet.addEventListener('touchstart', onStart, { passive: true });
+  sheet.addEventListener('touchmove',  onMove,  { passive: true });
+  sheet.addEventListener('touchend',   onEnd);
 }
 
 function closeModal() {
@@ -3938,7 +3974,10 @@ function renderSettings() {
             <div class="settings-member-action-label">💰 Adjust Savings</div>
             <div class="settings-member-action-sub">Deposit or withdraw real dollars — birthday money, allowance, or spending</div>
           </div>
-          <button class="btn btn-secondary btn-sm" onclick="showAdjustSavingsModal('${k.id}')">Adjust</button>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-secondary btn-sm" onclick="showSavingsHistory('${k.id}')"><i class="ph-duotone ph-clock-clockwise" style="font-size:0.9rem;vertical-align:middle"></i></button>
+            <button class="btn btn-secondary btn-sm" onclick="showAdjustSavingsModal('${k.id}')">Adjust</button>
+          </div>
         </div>` : ''}
         <div class="settings-member-action-row">
           <div style="flex:1">
@@ -4479,6 +4518,12 @@ const SETUP_STEPS_NEW  = ['welcome','parents','members','chores','prizes','sync'
 const SETUP_STEPS_EDIT = ['welcome','parents','members','sync','done'];
 let SETUP_STEPS = SETUP_STEPS_NEW;
 
+function cancelSetup() {
+  const user = S.currentUser;
+  if (user) routeToView(user);
+  else renderHome();
+}
+
 function goSetup() {
   SETUP_STEPS    = D.setup ? SETUP_STEPS_EDIT : SETUP_STEPS_NEW;
   S.setupStep    = 0;
@@ -4516,7 +4561,11 @@ function renderSetupStep() {
         <label class="form-label">Family name</label>
         <input type="text" id="setup-family-name" placeholder="The Smiths" value="${esc(D.family.name||'')}">
       </div>
-      <button class="btn btn-primary btn-full" onclick="setupNext()">Let's go →</button>`;
+      ${D.setup ? `
+      <div class="flex gap-10 mt-8">
+        <button class="btn btn-secondary" style="flex:0 0 80px" onclick="cancelSetup()">Cancel</button>
+        <button class="btn btn-primary" style="flex:1" onclick="setupNext()">Let's go →</button>
+      </div>` : `<button class="btn btn-primary btn-full" onclick="setupNext()">Let's go →</button>`}`;
       break;
 
     case 'parents': content = `
