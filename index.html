@@ -1902,6 +1902,52 @@ function checkForNewBonuses(member, isWhileAway = false) {
   });
 }
 
+function markSavingsSeen(memberId) {
+  const ids = (D.history || [])
+    .filter(h => h.memberId === memberId && h.type === 'savings_deposit')
+    .map(h => h.id);
+  try { localStorage.setItem(`_seenSavings_${memberId}`, JSON.stringify(ids)); } catch(e) {}
+}
+
+function getSeenSavingsIds(memberId) {
+  try {
+    const raw = localStorage.getItem(`_seenSavings_${memberId}`);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch { return new Set(); }
+}
+
+function checkForNewSavingsDeposits(member, isWhileAway = false) {
+  const seenIds = getSeenSavingsIds(member.id);
+  const newDeposits = (D.history || []).filter(h =>
+    h.memberId === member.id &&
+    h.type === 'savings_deposit' &&
+    !seenIds.has(h.id) &&
+    (h.dollars || 0) > 0
+  );
+  if (newDeposits.length === 0) return;
+  markSavingsSeen(member.id);
+  const fresh = getMember(member.id);
+  if (fresh) S.currentUser = fresh;
+  const tiny = isTiny(member);
+  const cur   = D.settings.currency || '$';
+  const total = newDeposits.reduce((s, d) => s + (d.dollars || 0), 0);
+  const titleHtml = isWhileAway
+    ? '<i class="ph-duotone ph-moon-stars" style="color:#16A34A"></i> While you were away...'
+    : '<i class="ph-duotone ph-piggy-bank" style="color:#16A34A"></i> Savings Deposit!';
+  const subText = newDeposits.length === 1
+    ? newDeposits[0].title
+    : `${newDeposits.length} deposits: ${newDeposits.map(d => d.title).join(', ')}`;
+  showCelebration({
+    icon:    '💵',
+    title:   titleHtml,
+    sub:     subText,
+    dollars: total,
+    cur,
+    tts:     tiny ? `Your savings went up ${cur}${total.toFixed(2)}! ${subText}` : null,
+    onClose: () => { renderKidDiamonds(); renderKidHeader(); renderKidNav(); },
+  });
+}
+
 function checkForApprovalCelebration(prevPendingKeys, member, isWhileAway = false) {
   let totalNewDiamonds = 0;
   const approvedChores = [];
@@ -1972,9 +2018,10 @@ function subscribeToFirestore(onFirstLoad) {
         if (!firstSnapshot && prevPending.size > 0 && S.currentUser?.role === 'kid') {
           checkForApprovalCelebration(prevPending, S.currentUser);
         }
-        // Trigger celebration for new manual bonus diamonds
+        // Trigger celebration for new manual bonus diamonds or savings deposits
         if (!firstSnapshot && S.currentUser?.role === 'kid') {
           checkForNewBonuses(S.currentUser, false);
+          checkForNewSavingsDeposits(S.currentUser, false);
         }
       }
     }
@@ -1989,6 +2036,7 @@ function subscribeToFirestore(onFirstLoad) {
         clearPendingSnapshot(S.currentUser.id);
         savePendingSnapshot(S.currentUser.id);
         checkForNewBonuses(S.currentUser, true); // check for manual bonuses while away
+        checkForNewSavingsDeposits(S.currentUser, true); // check for savings deposits while away
       }
       if (typeof onFirstLoad === 'function') onFirstLoad();
     } else {
@@ -2599,8 +2647,8 @@ function doContributeToGoal(memberId, goalId, diamonds) {
 }
 
 // ── HISTORY ───────────────────────────────────────────────────
-function addHistory(type, memberId, title, diamonds) {
-  D.history.unshift({ id:genId(), type, memberId, title, diamonds, date:today() });
+function addHistory(type, memberId, title, diamonds, extra = {}) {
+  D.history.unshift({ id:genId(), type, memberId, title, diamonds, date:today(), ...extra });
 }
 
 function historyIcon(h) {
@@ -3543,6 +3591,25 @@ function launchMixedRain(count = 120) {
   _startRain(pieces);
 }
 
+function launchDollarRain(count = 80) {
+  const bills = ['💵','💵','💵','💰','💵'];
+  const pieces = [];
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement('div');
+    el.className = 'diamond-rain-piece';
+    el.textContent = bills[i % bills.length];
+    el.style.cssText = `
+      left:${Math.random()*110 - 5}%;
+      font-size:${1.0 + Math.random()*1.6}rem;
+      animation-duration:${1.4 + Math.random()*2}s;
+      animation-delay:${Math.random()*1.4}s;
+      opacity:${0.7 + Math.random()*0.3};
+    `;
+    pieces.push(el);
+  }
+  _startRain(pieces);
+}
+
 // ── CELEBRATION OVERLAY ───────────────────────────────────────
 const _celebQueue = [];
 
@@ -3559,9 +3626,13 @@ function _showNextCelebration() {
   _renderCelebration(_celebQueue.shift());
 }
 
-function _renderCelebration({ icon='💎', title='Great job!', sub='', diamonds=null, tts=null, onClose=null }) {
+function _renderCelebration({ icon='💎', title='Great job!', sub='', diamonds=null, dollars=null, cur='$', tts=null, onClose=null }) {
   const root = document.getElementById('celebration-root');
-  const ptsHtml = diamonds !== null ? `<div class="cel-diamonds">+${diamonds} 💎</div>` : '';
+  const ptsHtml = diamonds !== null
+    ? `<div class="cel-diamonds">+${diamonds} 💎</div>`
+    : dollars !== null
+      ? `<div class="cel-diamonds" style="color:#16A34A">+${cur}${dollars.toFixed(2)} 💰</div>`
+      : '';
   const remaining = _celebQueue.length;
   const moreHtml = remaining > 0
     ? `<div style="font-size:0.78rem;color:var(--muted);margin-top:8px">${remaining} more notification${remaining > 1 ? 's' : ''} waiting...</div>`
@@ -3579,7 +3650,8 @@ function _renderCelebration({ icon='💎', title='Great job!', sub='', diamonds=
       </div>
     </div>`;
 
-  launchConfetti();
+  if (dollars !== null) launchDollarRain();
+  else launchConfetti();
   if (tts) speak(tts);
   window._celebOnClose = onClose;
 }
@@ -3624,6 +3696,18 @@ function testQueuedCelebrations() {
     sub:      'Your parent approved "Clean Your Room" and you earned diamonds!',
     diamonds: 8,
     onClose:  () => {},
+  });
+}
+
+function testSavingsDeposit() {
+  const cur = D.settings.currency || '$';
+  showCelebration({
+    icon:    '💵',
+    title:   '<i class="ph-duotone ph-piggy-bank" style="color:#16A34A"></i> Savings Deposit!',
+    sub:     'Birthday money from Grandma!',
+    dollars: 20,
+    cur,
+    onClose: () => {},
   });
 }
 
@@ -3757,6 +3841,14 @@ function renderSettings() {
           </div>
           <button class="btn btn-secondary btn-sm" onclick="showAddPointsModal('${k.id}')">Adjust</button>
         </div>
+        ${s.savingsEnabled !== false ? `
+        <div class="settings-member-action-row">
+          <div style="flex:1">
+            <div class="settings-member-action-label">💰 Adjust Savings</div>
+            <div class="settings-member-action-sub">Deposit or withdraw real dollars — birthday money, allowance, or spending</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="showAdjustSavingsModal('${k.id}')">Adjust</button>
+        </div>` : ''}
         <div class="settings-member-action-row">
           <div style="flex:1">
             <div class="settings-member-action-label"><i class="ph-duotone ph-house" style="color:#6C63FF;font-size:0.9rem;vertical-align:middle"></i> Split Household</div>
@@ -3927,7 +4019,8 @@ function renderSettings() {
         <button class="btn btn-secondary btn-full" style="margin-bottom:8px" onclick="launchConfetti(60)">💎 Test Diamond Rain</button>
         <button class="btn btn-secondary btn-full" style="margin-bottom:8px" onclick="launchMixedRain()">⚡ Test Combo Rain</button>
         <button class="btn btn-secondary btn-full" style="margin-bottom:8px" onclick="testWhileAwayModal()">💌 Test While You Were Away</button>
-        <button class="btn btn-secondary btn-full" style="margin-bottom:10px" onclick="testQueuedCelebrations()">📬 Test Queued Notifications (3)</button>
+        <button class="btn btn-secondary btn-full" style="margin-bottom:8px" onclick="testQueuedCelebrations()">📬 Test Queued Notifications (3)</button>
+        <button class="btn btn-secondary btn-full" style="margin-bottom:10px" onclick="testSavingsDeposit()">💰 Test Savings Deposit</button>
         <button class="btn btn-sm btn-full" style="background:#1f2937;color:#fff" onclick="showAdvancedEditor()"><i class="ph-duotone ph-wrench" style="font-size:1rem;vertical-align:middle"></i> Advanced Data Editor</button>
       </div>
 
@@ -7593,6 +7686,49 @@ function doAdjustPoints(memberId, sign) {
   renderSettings();
 }
 
+function showAdjustSavingsModal(memberId) {
+  const m = getMember(memberId);
+  if (!m) return;
+  const cur = D.settings.currency || '$';
+  showModal(`
+    <div class="modal-title">💰 Adjust Savings — ${esc(m.name)}</div>
+    <p style="color:var(--muted);font-size:0.9rem;margin-bottom:16px">Current balance: <strong>${cur}${(m.savings||0).toFixed(2)}</strong></p>
+    <div class="form-group">
+      <label class="form-label">Amount (${cur})</label>
+      <input type="number" id="adj-sav" min="0.01" step="0.01" placeholder="e.g. 5.00">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Reason <span class="form-label-hint">optional</span></label>
+      <input type="text" id="adj-sav-reason" placeholder="Birthday money, allowance...">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn" style="background:#FEE2E2;color:#991B1B;font-weight:700" onclick="doAdjustSavings('${memberId}',-1)">− Withdraw</button>
+      <button class="btn btn-primary" onclick="doAdjustSavings('${memberId}',1)">+ Deposit</button>
+    </div>`);
+}
+
+function doAdjustSavings(memberId, sign) {
+  const m      = getMember(memberId);
+  const amt    = parseFloat(document.getElementById('adj-sav')?.value) || 0;
+  const reason = document.getElementById('adj-sav-reason')?.value.trim();
+  const cur    = D.settings.currency || '$';
+  if (!m || amt <= 0) { toast('Enter an amount'); return; }
+  const dollars = parseFloat((sign * amt).toFixed(2));
+  m.savings = parseFloat(Math.max(0, (m.savings || 0) + dollars).toFixed(2));
+  if (sign > 0) {
+    const label = reason || 'A savings deposit from your parent!';
+    addHistory('savings_deposit', memberId, label, 0, { dollars: amt });
+  } else {
+    const label = reason ? `Withdrawal: ${reason}` : 'Savings withdrawal';
+    addHistory('savings_withdraw', memberId, label, 0, { dollars: amt });
+  }
+  saveData();
+  closeModal();
+  toast(`${dollars > 0 ? '+' : ''}${cur}${Math.abs(dollars).toFixed(2)} savings for ${m.name}`);
+  renderSettings();
+}
+
 function resetAllData() {
   if (!confirm('This will erase ALL family data. Are you absolutely sure?')) return;
   if (!confirm('Last chance — really reset everything?')) return;
@@ -7653,6 +7789,7 @@ function init() {
         if (rememberedUser.role === 'kid') {
           savePendingSnapshot(rememberedUser.id);
           markBonusesSeen(rememberedUser.id);
+          markSavingsSeen(rememberedUser.id);
         }
       } else {
         renderHome();
