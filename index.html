@@ -5617,17 +5617,20 @@ function renderFamilyStatsCard(kids) {
 
   const funSection = funTiles.trim() ? _statSection('Fun Facts', funTiles) : '';
 
+  const isExpanded = _familyStatsExpanded;
+  const caret = `<i class="ph-duotone ph-caret-${isExpanded?'up':'down'}" style="color:var(--muted);font-size:1.1rem;flex-shrink:0;margin-left:auto"></i>`;
+
   return `
     <div class="card" style="border-top:4px solid #6C63FF;padding:20px;margin-bottom:16px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
+      <div onclick="toggleFamilyStats()" style="cursor:pointer;display:flex;align-items:center;gap:10px;margin-bottom:${isExpanded?'18':'0'}px">
         <span style="font-size:2rem">👨‍👩‍👧‍👦</span>
         <div>
           <div style="font-size:1.1rem;font-weight:800">${esc(D.family.name || 'The Family')}</div>
           <div style="font-size:0.85rem;color:#6b7280">${kids.length} kid${kids.length !== 1 ? 's' : ''} · all-time combined stats</div>
         </div>
+        ${caret}
       </div>
-      ${overviewSection}
-      ${funSection}
+      ${isExpanded ? `${overviewSection}${funSection}` : ''}
     </div>`;
 }
 
@@ -5785,6 +5788,7 @@ function renderStatsPage(container) {
 const _expandedSlots     = new Set(); // 'choreId_kidId'
 const _expandedKids      = new Set(); // kidId (home tab)
 const _expandedStatsKids = new Set(); // kidId (stats tab)
+let _familyStatsExpanded = false;
 const _expandedChores    = new Set(); // choreId (chores tab)
 function toggleSlotExpand(key) {
   if (_expandedSlots.has(key)) _expandedSlots.delete(key);
@@ -5804,6 +5808,10 @@ function toggleKidSection(kidId) {
 function toggleStatsKid(kidId) {
   if (_expandedStatsKids.has(kidId)) _expandedStatsKids.delete(kidId);
   else _expandedStatsKids.add(kidId);
+  renderStatsPage(document.getElementById('parent-content'));
+}
+function toggleFamilyStats() {
+  _familyStatsExpanded = !_familyStatsExpanded;
   renderStatsPage(document.getElementById('parent-content'));
 }
 
