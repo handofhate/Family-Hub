@@ -1751,6 +1751,7 @@ function defaultData() {
     settings: {
       parentPin:        '',
       autoApprove:      false,
+      hideUnavailable:  false,
       diamondsPerDollar:  10,
       currency:         '$',
       lastSync:         null,
@@ -4322,7 +4323,7 @@ function renderKidChores() {
     html += `</div>`;
   }
 
-  if (unavailable.length > 0) {
+  if (unavailable.length > 0 && !D.settings.hideUnavailable) {
     html += `<div class="card-title mt-12"><i class="ph-duotone ph-clock" style="color:#9CA3AF;font-size:1rem;vertical-align:middle"></i> Later</div>`;
     html += `<div id="sort-unavail">`;
     unavailable.forEach(c => { html += normalChoreCard(c, m, progressMap.get(c.id), comboIds); });
@@ -6665,6 +6666,14 @@ function renderParentSettings() {
           <div class="toggle-sub">Kids earn diamonds instantly</div></div>
         <label class="toggle">
           <input type="checkbox" id="s-auto" ${s.autoApprove?'checked':''} onchange="saveSetting('autoApprove',this.checked)">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        <div><div class="toggle-label">Hide unavailable chores</div>
+          <div class="toggle-sub">Chores outside their allowed time window won't show on kids' screens</div></div>
+        <label class="toggle">
+          <input type="checkbox" ${s.hideUnavailable?'checked':''} onchange="saveSetting('hideUnavailable',this.checked)">
           <span class="toggle-track"></span>
         </label>
       </div>
