@@ -5364,15 +5364,15 @@ function renderStatsPage(container) {
 
 // ── PARENT HOME (OVERVIEW) ────────────────────────────────────
 const _expandedSlots  = new Set(); // 'choreId_kidId'
-const _collapsedKids  = new Set(); // kidId
+const _expandedKids   = new Set(); // kidId
 function toggleSlotExpand(key) {
   if (_expandedSlots.has(key)) _expandedSlots.delete(key);
   else _expandedSlots.add(key);
   renderParentHome();
 }
 function toggleKidSection(kidId) {
-  if (_collapsedKids.has(kidId)) _collapsedKids.delete(kidId);
-  else _collapsedKids.add(kidId);
+  if (_expandedKids.has(kidId)) _expandedKids.delete(kidId);
+  else _expandedKids.add(kidId);
   renderParentHome();
 }
 
@@ -5491,7 +5491,7 @@ function renderParentHome() {
               ${slotExpandSection ? `<div style="width:100%;margin-top:6px">${slotExpandSection}</div>` : ''}
             </div>`;
         }).join('')}</div>`;
-    const isKidCollapsed = _collapsedKids.has(kid.id);
+    const isKidCollapsed = !_expandedKids.has(kid.id);
     kidsHtml += `
       <div class="kid-overview-card" style="border-top:4px solid ${kid.color||'#6C63FF'}">
         <div class="member-row" style="padding:0;box-shadow:none;background:transparent;cursor:pointer" onclick="toggleKidSection('${kid.id}')">
