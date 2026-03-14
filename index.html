@@ -2032,10 +2032,8 @@ function normalizeChore(chore) {
   });
 
   const title = chore?.title || '';
-  const choreBadges = Array.isArray(chore?.badges) ? chore.badges : (() => {
-    const preset = CHORE_BADGE_PRESETS[title];
-    return preset ? preset.map(b => ({ id: genId(), ...b })) : [];
-  })();
+  const choreBadges = Array.isArray(chore?.badges) ? chore.badges :
+    !chore?.id ? (() => { const preset = CHORE_BADGE_PRESETS[title]; return preset ? preset.map(b => ({ id: genId(), ...b })) : []; })() : [];
 
   return {
     ...chore,
@@ -5820,7 +5818,7 @@ function renderParentHome() {
         <span style="background:${bg};color:${color};border-radius:8px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:0.85rem;flex-shrink:0">${icon}</span>
         <div style="flex:1;min-width:0">
           <div style="font-weight:600;font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(h.title)}</div>
-          <div style="font-size:0.77rem;color:var(--muted)">${mem ? `${mem.avatar} ${esc(mem.name)}` : ''} · ${fmtDate(h.date)}</div>
+          <div style="font-size:0.77rem;color:var(--muted)">${mem ? `${mem.avatar} ${esc(mem.name)}` : '<span style="font-style:italic">Deleted member</span>'} · ${fmtDate(h.date)}</div>
         </div>
         <span style="font-weight:700;color:${ptsColor};font-size:0.9rem;white-space:nowrap">${ptsStr} 💎</span>
       </div>`;
@@ -6938,7 +6936,7 @@ function _advRender() {
         const ptsCol = (h.diamonds||0) >= 0 ? '#166534' : '#991b1b';
         return `<div class="adv-hist-row" data-hist-id="${h.id}">
           <span style="width:20px;text-align:center">${typeIcon[h.type]||'<i class="ph-duotone ph-note" style="color:#9CA3AF"></i>'}</span>
-          <span style="width:24px">${mem?.avatar||''}</span>
+          <span style="width:24px">${mem?.avatar||'?'}</span>
           <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(h.title)}</span>
           <span style="color:${ptsCol};font-weight:700;white-space:nowrap;margin-right:6px">${ptsStr}</span>
           <span style="color:#9ca3af;white-space:nowrap;margin-right:8px">${h.date}</span>
