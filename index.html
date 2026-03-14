@@ -4326,7 +4326,7 @@ function addMemberCard() {
   renderSetupStep();
 }
 
-function removeMemberCard(i) { S.setupMembers.splice(i,1); renderSetupStep(); }
+function removeMemberCard(i) { if (!confirm('Remove this family member?')) return; S.setupMembers.splice(i,1); renderSetupStep(); }
 
 function setMemberField(i, field, value, rerender=false) {
   if (S.setupMembers[i]) S.setupMembers[i][field] = value;
@@ -4347,7 +4347,7 @@ function addParentCard() {
   renderSetupStep();
 }
 
-function removeParentCard(i) { S.setupParents.splice(i,1); renderSetupStep(); }
+function removeParentCard(i) { if (!confirm('Remove this parent?')) return; S.setupParents.splice(i,1); renderSetupStep(); }
 
 function setParentField(i, field, value, rerender=false) {
   if (S.setupParents[i]) S.setupParents[i][field] = value;
@@ -6408,6 +6408,7 @@ function addChoreBadge() {
 }
 
 function removeChoreBadge(i) {
+  if (!confirm('Remove this badge?')) return;
   _editBadges.splice(i, 1);
   renderBadgeEditor();
 }
