@@ -5181,7 +5181,7 @@ function renderKidDiamonds() {
       : matchOn
         ? `<div style="font-size:0.78rem;opacity:0.75;margin-bottom:12px">🤝 ${matchPct}% parent match active</div>`
         : '';
-    const _savTts = tiny ? ` onclick="speak('You have ${_savSpeech} in savings.${matchOn && matched > 0 ? ` Your parents have matched ${cur}${matched.toFixed(2)}.` : ''}')"` : '';
+    const _savTts = tiny ? ` onclick="speak('You have ${_savSpeech} in savings.${matchOn && matched > 0 ? ` Your parents have matched ${cur}${matched.toFixed(2)}.` : ''}${interestOn && interest > 0 ? ` You have earned ${cur}${interest.toFixed(2)} in interest.` : ''}')"` : '';
     html += `
       <div class="savings-card"${_savTts}>
         <div style="font-size:0.9rem;opacity:0.85;margin-bottom:4px"><i class="ph-duotone ph-piggy-bank" style="font-size:1rem;vertical-align:middle"></i> My Savings Jar</div>
