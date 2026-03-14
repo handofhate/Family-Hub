@@ -1988,7 +1988,7 @@ function checkForSavingsRequestOutcomes(member, isWhileAway = false) {
         : '<i class="ph-duotone ph-check-circle" style="color:#16A34A"></i> Spend Approved!',
       sub:        `${sub}. Balance: ${cur}${newBal.toFixed(2)}`,
       noAnimation: true,
-      tts:        tiny ? `Your parent said yes! You can spend ${cur}${r.amount.toFixed(2)}. You now have ${cur}${newBal.toFixed(2)} left in savings.` : null,
+      tts:        tiny ? `Your grown-up said yes! You can spend ${cur}${r.amount.toFixed(2)}. You now have ${cur}${newBal.toFixed(2)} left in savings.` : null,
       onClose:    () => { renderKidDiamonds(); renderKidHeader(); renderKidNav(); },
     });
   });
@@ -2001,7 +2001,7 @@ function checkForSavingsRequestOutcomes(member, isWhileAway = false) {
         : '<i class="ph-duotone ph-x-circle" style="color:#9CA3AF"></i> Not This Time',
       sub:        `Your spend request for ${sub} wasn't approved.`,
       noAnimation: true,
-      tts:        tiny ? `Mom or Dad said not right now for spending ${cur}${r.amount.toFixed(2)}.` : null,
+      tts:        tiny ? `Your grown-up said not right now for spending ${cur}${r.amount.toFixed(2)}.` : null,
       onClose:    () => {},
     });
   });
@@ -2043,7 +2043,7 @@ function checkForApprovalCelebration(prevPendingKeys, member, isWhileAway = fals
       title:    tiny ? '<i class="ph-duotone ph-moon-stars" style="color:#7C3AED"></i> While you were away...' : '<i class="ph-duotone ph-moon-stars" style="color:#7C3AED"></i> While you were away...',
       sub:      `Your parent approved ${subLine.replace(' approved!','')} and you earned diamonds!`,
       diamonds: totalNewDiamonds,
-      tts:      tiny ? `Welcome back! While you were away, your parent approved your chore and you earned ${totalNewDiamonds} diamonds!` : null,
+      tts:      tiny ? `Welcome back! While you were away, your grown-up approved your chore and you earned ${totalNewDiamonds} diamonds!` : null,
       onClose:  () => { renderKidChores(); renderKidHeader(); renderKidNav(); },
     });
   } else {
@@ -2052,7 +2052,7 @@ function checkForApprovalCelebration(prevPendingKeys, member, isWhileAway = fals
       title:    tiny ? '<i class="ph-duotone ph-confetti" style="color:#F97316"></i> Your parent said YES!' : '<i class="ph-duotone ph-check-circle" style="color:#16A34A"></i> Chore Approved!',
       sub:      subLine,
       diamonds: totalNewDiamonds,
-      tts:      tiny ? `Amazing! Your parent approved your chore! You earned ${totalNewDiamonds} diamonds!` : null,
+      tts:      tiny ? `Amazing! Your grown-up approved your chore! You earned ${totalNewDiamonds} diamonds!` : null,
       onClose:  () => { renderKidChores(); renderKidHeader(); renderKidNav(); },
     });
   }
@@ -5321,7 +5321,7 @@ function choreCompleteReact(chore, m, result, evt) {
   const tiny = isTiny(m);
   if (!result.approved) {
     toast('Chore submitted! Waiting for parent approval ⏳');
-    if (tiny) speak('All done! Waiting for Dad to check!');
+    if (tiny) speak('All done! Waiting for your grown-up to check!');
     renderKidChores(); renderKidHeader(); renderKidNav();
   } else {
     if (tiny) {
@@ -5403,7 +5403,7 @@ async function submitChorePhoto(choreId, slotId, entryType) {
     if (result.error) { toast(result.error); return; }
     if (result.isBefore) {
       toast('<i class="ph-duotone ph-camera" style="font-size:1rem;vertical-align:middle"></i> Before photo sent! Waiting for parent to approve the start ⏳');
-      if (isTiny(m)) speak('Photo sent! Waiting for Mom or Dad to say yes!');
+      if (isTiny(m)) speak('Photo sent! Waiting for your grown-up to say yes!');
       renderKidChores(); renderKidHeader(); renderKidNav();
       return;
     }
@@ -5555,7 +5555,7 @@ function renderKidDiamonds() {
            ${interestOn ? `<span>📈 ${interestRate}% interest ${interestTip}</span>` : ''}
          </div>`
       : '';
-    const _savTts = tiny ? ` onclick="speak('You have ${_savSpeech} in savings.${matchOn && matched > 0 ? ` Your parents have matched ${cur}${matched.toFixed(2)}.` : ''}${interestOn && interest > 0 ? ` You have earned ${cur}${interest.toFixed(2)} in interest.` : ''}')"` : '';
+    const _savTts = tiny ? ` onclick="speak('You have ${_savSpeech} in savings.${matchOn && matched > 0 ? ` Your grown-up matched ${cur}${matched.toFixed(2)}.` : ''}${interestOn && interest > 0 ? ` You have earned ${cur}${interest.toFixed(2)} in interest.` : ''}')"` : '';
     html += `
       <div class="savings-card"${_savTts}>
         <div style="font-size:0.9rem;opacity:0.85;margin-bottom:4px"><i class="ph-duotone ph-piggy-bank" style="font-size:1rem;vertical-align:middle"></i> My Savings Jar</div>
@@ -5645,7 +5645,7 @@ function submitSpendRequest(memberId) {
   saveData();
   closeModal();
   toast('<i class="ph-duotone ph-hourglass" style="font-size:1rem;vertical-align:middle"></i> Request sent! Waiting for parent approval ⏳');
-  if (isTiny(m)) speak('You asked to spend some money! Waiting for Mom or Dad to say yes!');
+  if (isTiny(m)) speak('You asked to spend some money! Waiting for your grown-up to say yes!');
   renderKidDiamonds();
 }
 
@@ -5875,7 +5875,7 @@ function confirmRedeem(prizeId) {
     icon:   renderIcon(prize.icon, prize.iconColor, 'font-size:3.5rem'),
     title:  'Prize Unlocked!',
     sub:    prize.title,
-    tts:    isTiny(m) ? `You got it! ${prize.title}! Go tell Mom or Dad!` : null,
+    tts:    isTiny(m) ? `You got it! ${prize.title}! Go show your grown-up!` : null,
     onClose: () => { renderKidShop(); renderKidHeader(); }
   });
 }
