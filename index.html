@@ -664,7 +664,7 @@
     .modal-overlay {
       position: fixed; inset: 0;
       background: rgba(0,0,0,0.45);
-      z-index: 500;
+      z-index: 2500;
       display: flex;
       align-items: flex-end;
       padding: 0 0 0 0;
@@ -3461,48 +3461,43 @@ function toggleSettingsMember(id) {
 }
 
 function showResetPinFlow() {
-  const hasPIN = !!D.settings.parentPin;
-  const hasbio = !!getBiometricCredentialId();
-
-  if (!hasPIN) {
+  if (!D.settings.parentPin) {
     // No current PIN — go straight to setting a new one
-    showModal(`
-      <div class="modal-title">Set Parent PIN</div>
-      <div class="form-group">
-        <label class="form-label">New PIN <span class="form-label-hint">up to 4 digits · leave blank to disable</span></label>
-        <input type="password" id="rp-new" maxlength="4" placeholder="4 digits" inputmode="numeric">
-      </div>
-      <div class="modal-actions">
-        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-        <button class="btn btn-primary" onclick="applyNewPin()">Save</button>
-      </div>`);
+    showNewPinModal();
     return;
   }
-
-  showModal(`
-    <div class="modal-title">Reset Parent PIN</div>
-    <p style="color:var(--muted);font-size:0.9rem;margin-bottom:16px">Verify your identity first.</p>
-    ${hasbio ? `<button class="btn btn-secondary btn-full" style="margin-bottom:12px" onclick="verifyBioForPinReset()"><i class="ph-duotone ph-fingerprint" style="font-size:1rem;vertical-align:middle"></i> Use Face ID</button>` : ''}
-    <div class="form-group">
-      <label class="form-label">Current PIN</label>
-      <input type="password" id="rp-current" maxlength="4" placeholder="4 digits" inputmode="numeric">
+  // Close settings and use the real PIN/Face ID screen for verification
+  closeSettings();
+  showScreen('screen-pin');
+  S.pinBuffer = '';
+  S.pinMode   = 'pinReset';
+  document.getElementById('pin-content').innerHTML = `
+    <div class="pin-avatar">🔐</div>
+    <div class="pin-title">Verify Identity</div>
+    <div class="pin-sub">Enter your current PIN to reset it</div>
+    <div class="pin-dots" id="pin-dots">
+      <div class="pin-dot" id="pd0"></div>
+      <div class="pin-dot" id="pd1"></div>
+      <div class="pin-dot" id="pd2"></div>
+      <div class="pin-dot" id="pd3"></div>
     </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="verifyPinForReset()">Continue</button>
-    </div>`);
+    <div class="pin-grid">
+      ${[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map(k => `
+        <button class="pin-key${k===''?' hidden':''}" onclick="pinKey('${k}')">${k}</button>
+      `).join('')}
+    </div>
+    <div id="pin-error" class="pin-error hidden"></div>
+    ${getBiometricCredentialId() ? `<button class="btn btn-secondary mt-16" style="width:min(360px,calc(100vw - 48px))" onclick="tryBiometricUnlock()"><i class="ph-duotone ph-fingerprint" style="font-size:1rem;vertical-align:middle"></i> Use Face ID</button>` : ''}
+    <button class="btn btn-secondary mt-16" style="width:min(360px,calc(100vw - 48px))" onclick="openUserSettings()">Cancel</button>`;
+  clearTimeout(S._biometricTimer);
+  if (getBiometricCredentialId()) {
+    S._biometricTimer = setTimeout(() => tryBiometricUnlock(), 400);
+  }
 }
 
-async function verifyBioForPinReset() {
-  const ok = await authenticateBiometric(() => {});
-  if (ok) showNewPinModal();
-  else toast('Biometric failed — enter your PIN instead');
-}
-
-function verifyPinForReset() {
-  const entered = document.getElementById('rp-current')?.value.trim();
-  if (entered !== D.settings.parentPin) { toast('Incorrect PIN'); return; }
-  closeModal();
+function afterPinResetVerified() {
+  renderSettings();
+  document.getElementById('settings-root').classList.add('open');
   showNewPinModal();
 }
 
@@ -3911,6 +3906,7 @@ function pinKey(k) {
     setTimeout(() => {
       if (S.pinBuffer === D.settings.parentPin) {
         S.pinBuffer = '';
+        if (S.pinMode === 'pinReset') { afterPinResetVerified(); return; }
         if (S.pinMode === 'app') {
           setAppUnlocked(true);
           const rememberedUser = getMember(getCurrentUserId());
@@ -4008,6 +4004,7 @@ function removeBiometric() {
 function tryBiometricUnlock() {
   authenticateBiometric(() => {
     S.pinBuffer = '';
+    if (S.pinMode === 'pinReset') { afterPinResetVerified(); return; }
     if (S.pinMode === 'app') {
       setAppUnlocked(true);
       const rememberedUser = getMember(getCurrentUserId());
