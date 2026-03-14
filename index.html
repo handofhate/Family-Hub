@@ -3498,9 +3498,18 @@ function diamondsBurst(x, y, diamonds) {
 }
 
 // ── DIAMOND RAIN ──────────────────────────────────────────────
-function launchConfetti(count = 50, emoji = '💎') {
+let _rainClearTimer = null;
+
+function _startRain(pieces) {
   const wrap = document.getElementById('confetti-root');
+  if (_rainClearTimer) { clearTimeout(_rainClearTimer); _rainClearTimer = null; }
   wrap.innerHTML = '';
+  pieces.forEach(el => wrap.appendChild(el));
+  _rainClearTimer = setTimeout(() => { wrap.innerHTML = ''; _rainClearTimer = null; }, 5000);
+}
+
+function launchConfetti(count = 50, emoji = '💎') {
+  const pieces = [];
   for (let i = 0; i < count; i++) {
     const el = document.createElement('div');
     el.className = 'diamond-rain-piece';
@@ -3512,14 +3521,13 @@ function launchConfetti(count = 50, emoji = '💎') {
       animation-delay:${Math.random()*1.4}s;
       opacity:${0.7 + Math.random()*0.3};
     `;
-    wrap.appendChild(el);
+    pieces.push(el);
   }
-  setTimeout(() => { wrap.innerHTML = ''; }, 5000);
+  _startRain(pieces);
 }
 
 function launchMixedRain(count = 120) {
-  const wrap = document.getElementById('confetti-root');
-  wrap.innerHTML = '';
+  const pieces = [];
   for (let i = 0; i < count; i++) {
     const el = document.createElement('div');
     el.className = 'diamond-rain-piece';
@@ -3531,9 +3539,9 @@ function launchMixedRain(count = 120) {
       animation-delay:${Math.random()*1.4}s;
       opacity:${0.7 + Math.random()*0.3};
     `;
-    wrap.appendChild(el);
+    pieces.push(el);
   }
-  setTimeout(() => { wrap.innerHTML = ''; }, 5000);
+  _startRain(pieces);
 }
 
 // ── CELEBRATION OVERLAY ───────────────────────────────────────
