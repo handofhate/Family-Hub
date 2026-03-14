@@ -5778,8 +5778,8 @@ function renderFamilyStatsCard(kids) {
 
   return `
     <div class="card" style="border-top:4px solid #6C63FF;padding:20px;margin-bottom:16px">
-      <div onclick="toggleFamilyStats()" style="cursor:pointer;display:flex;align-items:center;gap:10px;margin-bottom:${isExpanded?'18':'0'}px">
-        <img src="icon.svg" style="width:2.2rem;height:2.2rem;border-radius:10px;flex-shrink:0">
+      <div onclick="toggleFamilyStats()" style="cursor:pointer;display:flex;align-items:center;gap:12px;margin-bottom:${isExpanded?'18':'0'}px">
+        <img src="icon.svg" style="width:2.5rem;height:2.5rem;border-radius:10px;flex-shrink:0">
         <div>
           <div style="font-size:1.1rem;font-weight:800">${esc(D.family.name || 'The Family')}</div>
           <div style="font-size:0.85rem;color:#6b7280">${kids.length} kid${kids.length !== 1 ? 's' : ''} · all-time combined stats</div>
