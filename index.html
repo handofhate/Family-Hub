@@ -2547,7 +2547,6 @@ function doContributeToGoal(memberId, goalId, diamonds) {
 // ── HISTORY ───────────────────────────────────────────────────
 function addHistory(type, memberId, title, diamonds) {
   D.history.unshift({ id:genId(), type, memberId, title, diamonds, date:today() });
-  if (D.history.length > 80) D.history.pop();
 }
 
 // ── LEVELS & BADGES ──────────────────────────────────────────
@@ -4379,23 +4378,18 @@ function setupNext() {
     DEFAULT_CHORES.forEach((c,i) => {
       const cb = document.getElementById('sc'+i);
       if (cb && cb.checked && !D.chores.find(x=>x.title===c.title)) {
-        D.chores.push({
-          id: genId(),
+        const chore = normalizeChore({
           title: c.title,
-          icon:  c.icon,
+          icon: c.icon,
+          iconColor: c.iconColor,
           diamonds: c.diamonds,
-          frequency: c.frequency === 'weekly' ? 'week' : c.frequency === 'once' ? 'once' : 'day',
-          repeatCount: 1,
-          schedule: {
-            period: c.frequency === 'weekly' ? 'week' : c.frequency === 'once' ? 'once' : 'day',
-            targetCount: 1,
-            daysOfWeek: c.frequency === 'once' ? [] : ALL_DAYS.slice(),
-            windows: {},
-          },
+          frequency: c.frequency,
           assignedTo: kidMembers.map(k=>k.id),
           completions: {},
           description: '',
         });
+        chore.id = genId();
+        D.chores.push(chore);
       }
     });
   }
