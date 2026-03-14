@@ -4487,6 +4487,25 @@ function switchKidTab(tab) {
   S.kidTab = tab;
   renderKidNav();
   renderKidTab();
+  const m = S.currentUser;
+  if (!m || !isTiny(m)) return;
+  const dmds = m.diamonds || 0;
+  if (tab === 'chores') {
+    const myChores = D.chores.filter(c => c.assignedTo?.includes(m.id));
+    const doneCount = myChores.filter(c => getChoreProgress(c, m.id).status === 'done').length;
+    speak(`Let's look at your chores. Today you have completed ${doneCount} out of ${myChores.length}.`);
+  } else if (tab === 'diamonds') {
+    const { current: lvl } = getMemberLevel(m);
+    const streak = m.streak?.current || 0;
+    speak(`You currently have ${dmds} diamonds, you are level ${lvl.level}, and have a ${streak} day streak.`);
+  } else if (tab === 'shop') {
+    const affordable = D.prizes.filter(p => p.type === 'individual' && (p.cost || 0) <= dmds).length;
+    speak(`You have ${dmds} diamonds to spend and can afford ${affordable} prize${affordable === 1 ? '' : 's'}.`);
+  } else if (tab === 'team') {
+    speak('Spend your diamonds towards team goals.');
+  } else if (tab === 'stats') {
+    speak('Good job! Here\'s everything you\'ve accomplished.');
+  }
 }
 
 
