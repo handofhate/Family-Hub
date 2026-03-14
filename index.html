@@ -5363,10 +5363,16 @@ function renderStatsPage(container) {
 }
 
 // ── PARENT HOME (OVERVIEW) ────────────────────────────────────
-const _expandedSlots = new Set(); // 'choreId_kidId'
+const _expandedSlots  = new Set(); // 'choreId_kidId'
+const _collapsedKids  = new Set(); // kidId
 function toggleSlotExpand(key) {
   if (_expandedSlots.has(key)) _expandedSlots.delete(key);
   else _expandedSlots.add(key);
+  renderParentHome();
+}
+function toggleKidSection(kidId) {
+  if (_collapsedKids.has(kidId)) _collapsedKids.delete(kidId);
+  else _collapsedKids.add(kidId);
   renderParentHome();
 }
 
@@ -5485,9 +5491,10 @@ function renderParentHome() {
               ${slotExpandSection ? `<div style="width:100%;margin-top:6px">${slotExpandSection}</div>` : ''}
             </div>`;
         }).join('')}</div>`;
+    const isKidCollapsed = _collapsedKids.has(kid.id);
     kidsHtml += `
       <div class="kid-overview-card" style="border-top:4px solid ${kid.color||'#6C63FF'}">
-        <div class="member-row" style="padding:0;box-shadow:none;background:transparent">
+        <div class="member-row" style="padding:0;box-shadow:none;background:transparent;cursor:pointer" onclick="toggleKidSection('${kid.id}')">
           <span class="member-avatar">${kid.avatar||'🙂'}</span>
           <div class="member-info">
             <div class="member-name">${esc(kid.name)}</div>
@@ -5496,9 +5503,12 @@ function renderParentHome() {
               <div class="progress-fill" style="width:${pct}%;background:${kid.color||'var(--purple)'}"></div>
             </div>
           </div>
-          <div class="member-dmds">${kid.diamonds||0}</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="member-dmds">${kid.diamonds||0}</div>
+            <i class="ph-duotone ph-caret-${isKidCollapsed?'down':'up'}" style="color:var(--muted);font-size:1.1rem;flex-shrink:0"></i>
+          </div>
         </div>
-        ${choreRows}
+        ${isKidCollapsed ? '' : choreRows}
       </div>`;
   });
   html += `<div class="card"><div class="card-title"><i class="ph-duotone ph-users-three" style="color:#6C63FF;font-size:1rem;vertical-align:middle"></i> Kids Today</div>${kids.length>0?`<div class="overview-kids-grid">${kidsHtml}</div>`:kidsHtml}</div>`;
