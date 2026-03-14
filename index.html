@@ -3174,45 +3174,50 @@ function _nlToggleKid(kidId) {
   _renderNL();
 }
 
-// ── NL ALARM (Web Audio API siren) ───────────────────────────
-let _nlAudioCtx = null;
-let _nlOsc      = null;
-let _nlGain     = null;
-let _nlLfoOsc   = null;  // LFO that sweeps the pitch up and down
+// ── NL ALARM (repeating deep bonk) ───────────────────────────
+// Single persistent AudioContext — reused across presses.
+// Each bonk fires a fresh short oscillator (self-disposing).
+let _nlAudioCtx  = null;
+let _nlBonkTimer = null;
+
+function _nlBonk() {
+  try {
+    const ctx = _nlAudioCtx;
+    if (!ctx || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.001, t);
+    gain.gain.linearRampToValueAtTime(0.65, t + 0.018); // fast attack
+    gain.gain.setValueAtTime(0.65, t + 0.15);           // short hold
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.46); // decay
+    gain.connect(ctx.destination);
+
+    const osc = ctx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(150, t);
+    osc.frequency.exponentialRampToValueAtTime(85, t + 0.46); // pitch drop = thud
+    osc.connect(gain);
+    osc.start(t);
+    osc.stop(t + 0.5);
+  } catch(e) {}
+}
 
 function _nlAlarmStart() {
   try {
-    _nlAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-    _nlGain = _nlAudioCtx.createGain();
-    _nlGain.gain.value = 0.55;
-    _nlGain.connect(_nlAudioCtx.destination);
-
-    // Main oscillator — sawtooth for that harsh alarm bite
-    _nlOsc = _nlAudioCtx.createOscillator();
-    _nlOsc.type = 'sawtooth';
-    _nlOsc.frequency.value = 880;
-    _nlOsc.connect(_nlGain);
-    _nlOsc.start();
-
-    // LFO that sweeps pitch between ~660 Hz and ~1100 Hz at ~1.4 Hz
-    _nlLfoOsc = _nlAudioCtx.createOscillator();
-    _nlLfoOsc.type = 'sine';
-    _nlLfoOsc.frequency.value = 1.4;
-
-    const lfoGain = _nlAudioCtx.createGain();
-    lfoGain.gain.value = 220;  // ±220 Hz sweep around 880
-    _nlLfoOsc.connect(lfoGain);
-    lfoGain.connect(_nlOsc.frequency);
-    _nlLfoOsc.start();
-  } catch(e) { /* audio not available — silently skip */ }
+    if (!_nlAudioCtx || _nlAudioCtx.state === 'closed') {
+      _nlAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (_nlAudioCtx.state === 'suspended') _nlAudioCtx.resume();
+    _nlBonk();
+    _nlBonkTimer = setInterval(_nlBonk, 700);
+  } catch(e) {}
 }
 
 function _nlAlarmStop() {
   try {
-    if (_nlOsc)    { _nlOsc.stop();    _nlOsc    = null; }
-    if (_nlLfoOsc) { _nlLfoOsc.stop(); _nlLfoOsc = null; }
-    if (_nlAudioCtx) { _nlAudioCtx.close(); _nlAudioCtx = null; }
+    if (_nlBonkTimer) { clearInterval(_nlBonkTimer); _nlBonkTimer = null; }
+    // Keep _nlAudioCtx alive for reuse
   } catch(e) {}
 }
 
