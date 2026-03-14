@@ -1786,8 +1786,9 @@ function defaultData() {
     family: { name:'Our Family', members:[] },
     chores:     [],
     prizes:     [],
-    teamGoals:  [],
-    history:    [],
+    teamGoals:       [],
+    history:         [],
+    savingsRequests: [],
   };
 }
 
@@ -1948,6 +1949,64 @@ function checkForNewSavingsDeposits(member, isWhileAway = false) {
   });
 }
 
+function markSpendOutcomesSeen(memberId) {
+  const ids = (D.savingsRequests || [])
+    .filter(r => r.memberId === memberId && r.status !== 'pending')
+    .map(r => r.id);
+  try { localStorage.setItem(`_seenSpend_${memberId}`, JSON.stringify(ids)); } catch(e) {}
+}
+
+function getSeenSpendOutcomeIds(memberId) {
+  try {
+    const raw = localStorage.getItem(`_seenSpend_${memberId}`);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch { return new Set(); }
+}
+
+function checkForSavingsRequestOutcomes(member, isWhileAway = false) {
+  const seenIds = getSeenSpendOutcomeIds(member.id);
+  const unseen  = (D.savingsRequests || []).filter(r =>
+    r.memberId === member.id && r.status !== 'pending' && !seenIds.has(r.id)
+  );
+  if (unseen.length === 0) return;
+  markSpendOutcomesSeen(member.id);
+  const cur     = D.settings.currency || '$';
+  const fresh   = getMember(member.id);
+  if (fresh) S.currentUser = fresh;
+  const tiny    = isTiny(member);
+  const approved = unseen.filter(r => r.status === 'approved');
+  const denied   = unseen.filter(r => r.status === 'denied');
+  approved.forEach(r => {
+    const newBal = getMember(member.id)?.savings || 0;
+    const sub = r.reason
+      ? `"${r.reason}" — ${cur}${r.amount.toFixed(2)} approved`
+      : `${cur}${r.amount.toFixed(2)} approved`;
+    showCelebration({
+      icon:       '🛍️',
+      title:      isWhileAway
+        ? '<i class="ph-duotone ph-moon-stars" style="color:#6C63FF"></i> While you were away...'
+        : '<i class="ph-duotone ph-check-circle" style="color:#16A34A"></i> Spend Approved!',
+      sub:        `${sub}. Balance: ${cur}${newBal.toFixed(2)}`,
+      noAnimation: true,
+      tts:        tiny ? `Your parent said yes! You can spend ${cur}${r.amount.toFixed(2)}. You now have ${cur}${newBal.toFixed(2)} left in savings.` : null,
+      onClose:    () => { renderKidDiamonds(); renderKidHeader(); renderKidNav(); },
+    });
+  });
+  denied.forEach(r => {
+    const sub = r.reason ? `"${r.reason}" — ${cur}${r.amount.toFixed(2)}` : `${cur}${r.amount.toFixed(2)}`;
+    showCelebration({
+      icon:       '😔',
+      title:      isWhileAway
+        ? '<i class="ph-duotone ph-moon-stars" style="color:#6B7280"></i> While you were away...'
+        : '<i class="ph-duotone ph-x-circle" style="color:#9CA3AF"></i> Not This Time',
+      sub:        `Your spend request for ${sub} wasn't approved.`,
+      noAnimation: true,
+      tts:        tiny ? `Mom or Dad said not right now for spending ${cur}${r.amount.toFixed(2)}.` : null,
+      onClose:    () => {},
+    });
+  });
+}
+
 function checkForApprovalCelebration(prevPendingKeys, member, isWhileAway = false) {
   let totalNewDiamonds = 0;
   const approvedChores = [];
@@ -2018,10 +2077,11 @@ function subscribeToFirestore(onFirstLoad) {
         if (!firstSnapshot && prevPending.size > 0 && S.currentUser?.role === 'kid') {
           checkForApprovalCelebration(prevPending, S.currentUser);
         }
-        // Trigger celebration for new manual bonus diamonds or savings deposits
+        // Trigger celebration for new manual bonus diamonds, savings deposits, or spend outcomes
         if (!firstSnapshot && S.currentUser?.role === 'kid') {
           checkForNewBonuses(S.currentUser, false);
           checkForNewSavingsDeposits(S.currentUser, false);
+          checkForSavingsRequestOutcomes(S.currentUser, false);
         }
       }
     }
@@ -2037,6 +2097,7 @@ function subscribeToFirestore(onFirstLoad) {
         savePendingSnapshot(S.currentUser.id);
         checkForNewBonuses(S.currentUser, true); // check for manual bonuses while away
         checkForNewSavingsDeposits(S.currentUser, true); // check for savings deposits while away
+        checkForSavingsRequestOutcomes(S.currentUser, true); // check for spend request outcomes while away
       }
       if (typeof onFirstLoad === 'function') onFirstLoad();
     } else {
@@ -2228,7 +2289,8 @@ function normalizeData(data) {
   normalized.prizes = Array.isArray(normalized.prizes)
     ? normalized.prizes.map(p => ({ icon:'gift', iconColor:'#FF6584', ...p }))
     : [];
-  normalized.history = Array.isArray(normalized.history) ? normalized.history : [];
+  normalized.history         = Array.isArray(normalized.history)         ? normalized.history         : [];
+  normalized.savingsRequests = Array.isArray(normalized.savingsRequests) ? normalized.savingsRequests : [];
   normalized.teamGoals = Array.isArray(normalized.teamGoals)
     ? normalized.teamGoals.map(g => ({ icon: 'trophy', iconColor: '#FFD93D', ...g }))
     : [];
@@ -2459,6 +2521,10 @@ function pendingApprovals() {
     }
   }
   return arr;
+}
+
+function pendingSpendRequests() {
+  return (D.savingsRequests || []).filter(r => r.status === 'pending');
 }
 
 function inProgressChores() {
@@ -3626,7 +3692,7 @@ function _showNextCelebration() {
   _renderCelebration(_celebQueue.shift());
 }
 
-function _renderCelebration({ icon='💎', title='Great job!', sub='', diamonds=null, dollars=null, cur='$', tts=null, onClose=null }) {
+function _renderCelebration({ icon='💎', title='Great job!', sub='', diamonds=null, dollars=null, cur='$', noAnimation=false, tts=null, onClose=null }) {
   const root = document.getElementById('celebration-root');
   const ptsHtml = diamonds !== null
     ? `<div class="cel-diamonds">+${diamonds} 💎</div>`
@@ -3650,8 +3716,10 @@ function _renderCelebration({ icon='💎', title='Great job!', sub='', diamonds=
       </div>
     </div>`;
 
-  if (dollars !== null) launchDollarRain();
-  else launchConfetti();
+  if (!noAnimation) {
+    if (dollars !== null) launchDollarRain();
+    else launchConfetti();
+  }
   if (tts) speak(tts);
   window._celebOnClose = onClose;
 }
@@ -3708,6 +3776,27 @@ function testSavingsDeposit() {
     dollars: 20,
     cur,
     onClose: () => {},
+  });
+}
+
+function testSpendApproved() {
+  const cur = D.settings.currency || '$';
+  showCelebration({
+    icon:        '🛍️',
+    title:       '<i class="ph-duotone ph-check-circle" style="color:#16A34A"></i> Spend Approved!',
+    sub:         '"Lego set" — $15.00 approved. Balance: $32.50',
+    noAnimation: true,
+    onClose:     () => {},
+  });
+}
+
+function testSpendDenied() {
+  showCelebration({
+    icon:        '😔',
+    title:       '<i class="ph-duotone ph-x-circle" style="color:#9CA3AF"></i> Not This Time',
+    sub:         'Your spend request for "Video game" — $60.00 wasn\'t approved.',
+    noAnimation: true,
+    onClose:     () => {},
   });
 }
 
@@ -4020,7 +4109,9 @@ function renderSettings() {
         <button class="btn btn-secondary btn-full" style="margin-bottom:8px" onclick="launchMixedRain()">⚡ Test Combo Rain</button>
         <button class="btn btn-secondary btn-full" style="margin-bottom:8px" onclick="testWhileAwayModal()">💌 Test While You Were Away</button>
         <button class="btn btn-secondary btn-full" style="margin-bottom:8px" onclick="testQueuedCelebrations()">📬 Test Queued Notifications (3)</button>
-        <button class="btn btn-secondary btn-full" style="margin-bottom:10px" onclick="testSavingsDeposit()">💰 Test Savings Deposit</button>
+        <button class="btn btn-secondary btn-full" style="margin-bottom:8px" onclick="testSavingsDeposit()">💰 Test Savings Deposit</button>
+        <button class="btn btn-secondary btn-full" style="margin-bottom:8px" onclick="testSpendApproved()">🛍️ Test Spend Approved</button>
+        <button class="btn btn-secondary btn-full" style="margin-bottom:10px" onclick="testSpendDenied()">😔 Test Spend Denied</button>
         <button class="btn btn-sm btn-full" style="background:#1f2937;color:#fff" onclick="showAdvancedEditor()"><i class="ph-duotone ph-wrench" style="font-size:1rem;vertical-align:middle"></i> Advanced Data Editor</button>
       </div>
 
@@ -5472,7 +5563,15 @@ function renderKidDiamonds() {
         ${breakdownHtml}
         ${tipsHtml}
         <div class="savings-label">Keep saving!</div>
-        <button class="btn btn-secondary btn-sm" onclick="showSavingsModal('${m.id}');event.stopPropagation()">+ Add Savings</button>
+        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" onclick="showSavingsModal('${m.id}');event.stopPropagation()">+ Add Savings</button>
+          ${(function(){
+            const hasPending = (D.savingsRequests||[]).some(r=>r.memberId===m.id&&r.status==='pending');
+            if (hasPending) return `<button class="btn btn-sm" style="background:#FEF3C7;color:#92400E;pointer-events:none" onclick="event.stopPropagation()"><i class="ph-duotone ph-hourglass" style="font-size:0.9rem;vertical-align:middle"></i> Request Pending</button>`;
+            if (sav > 0) return `<button class="btn btn-sm" style="background:#EDE9FE;color:#6C63FF" onclick="showSpendRequestModal('${m.id}');event.stopPropagation()"><i class="ph-duotone ph-shopping-cart" style="font-size:0.9rem;vertical-align:middle"></i> Spend</button>`;
+            return '';
+          })()}
+        </div>
       </div>`;
   }
 
@@ -5504,6 +5603,76 @@ function renderKidDiamonds() {
   }
 
   document.getElementById('kid-content').innerHTML = html;
+}
+
+function showSpendRequestModal(memberId) {
+  const m = getMember(memberId);
+  if (!m) return;
+  const cur = D.settings.currency || '$';
+  const sav = m.savings || 0;
+  const hasPending = (D.savingsRequests || []).some(r => r.memberId === memberId && r.status === 'pending');
+  if (hasPending) { toast('You already have a request waiting for approval.'); return; }
+  if (sav <= 0) { toast('No savings to spend.'); return; }
+  showModal(`
+    <div class="modal-title"><i class="ph-duotone ph-shopping-cart" style="color:#6C63FF;font-size:1.2rem;vertical-align:middle"></i> Spend Savings</div>
+    <p style="color:var(--muted);font-size:0.9rem;margin-bottom:16px">Balance: <strong>${cur}${sav.toFixed(2)}</strong> — your parent will approve this.</p>
+    <div class="form-group">
+      <label class="form-label">Amount (${cur})</label>
+      <input type="number" id="spend-amt" min="0.01" max="${sav.toFixed(2)}" step="0.01" placeholder="e.g. 10.00">
+    </div>
+    <div class="form-group">
+      <label class="form-label">What for? <span class="form-label-hint">optional</span></label>
+      <input type="text" id="spend-reason" placeholder="Lego set, book, game...">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitSpendRequest('${memberId}')">Send Request</button>
+    </div>`);
+}
+
+function submitSpendRequest(memberId) {
+  const m      = getMember(memberId);
+  const amt    = parseFloat(document.getElementById('spend-amt')?.value) || 0;
+  const reason = document.getElementById('spend-reason')?.value.trim() || '';
+  const cur    = D.settings.currency || '$';
+  if (!m || amt <= 0) { toast('Enter an amount'); return; }
+  if (amt > (m.savings || 0)) { toast(`You only have ${cur}${(m.savings||0).toFixed(2)} saved.`); return; }
+  if ((D.savingsRequests || []).some(r => r.memberId === memberId && r.status === 'pending')) {
+    toast('Request already pending.'); return;
+  }
+  D.savingsRequests = D.savingsRequests || [];
+  D.savingsRequests.push({ id: genId(), memberId, amount: amt, reason, status: 'pending', date: today(), createdAt: Date.now() });
+  saveData();
+  closeModal();
+  toast('<i class="ph-duotone ph-hourglass" style="font-size:1rem;vertical-align:middle"></i> Request sent! Waiting for parent approval ⏳');
+  if (isTiny(m)) speak('You asked to spend some money! Waiting for Mom or Dad to say yes!');
+  renderKidDiamonds();
+}
+
+function approveSavingsRequest(requestId) {
+  const req = (D.savingsRequests || []).find(r => r.id === requestId);
+  if (!req) return;
+  const m   = getMember(req.memberId);
+  const cur = D.settings.currency || '$';
+  if (!m) return;
+  const actual = Math.min(req.amount, m.savings || 0);
+  m.savings = parseFloat(Math.max(0, (m.savings || 0) - actual).toFixed(2));
+  req.status = 'approved';
+  const label = req.reason ? `Spent: ${req.reason}` : 'Savings withdrawal approved';
+  addHistory('savings_withdraw', req.memberId, label, 0, { dollars: actual });
+  saveData();
+  toast(`Approved ${cur}${actual.toFixed(2)} spend for ${m.name}`);
+  renderParentHome(); renderParentHeader(); renderParentNav();
+}
+
+function denySavingsRequest(requestId) {
+  const req = (D.savingsRequests || []).find(r => r.id === requestId);
+  if (!req) return;
+  const m = getMember(req.memberId);
+  req.status = 'denied';
+  saveData();
+  toast(`Spend request denied for ${m?.name || 'kid'}`);
+  renderParentHome(); renderParentHeader(); renderParentNav();
 }
 
 function showSavingsModal(memberId) {
@@ -5831,7 +6000,7 @@ function renderParentView() {
 
 function renderParentHeader() {
   const m = S.currentUser;
-  const pending    = pendingApprovals().length;
+  const pending    = pendingApprovals().length + pendingSpendRequests().length;
   const inProgress = inProgressChores().length;
   document.getElementById('parent-header').innerHTML = `
     <div class="header-left">
@@ -5848,7 +6017,7 @@ function renderParentHeader() {
 }
 
 function renderParentNav() {
-  const pending    = pendingApprovals().length;
+  const pending    = pendingApprovals().length + pendingSpendRequests().length;
   const inProgress = inProgressChores().length;
   const homeCount  = pending + inProgress;
   const tabs = [
@@ -6252,13 +6421,15 @@ function toggleFamilyStats() {
 }
 
 function renderParentHome() {
-  const kids    = D.family.members.filter(m=>m.role==='kid'&&!m.deleted);
-  const pending = pendingApprovals();
-  const t       = today();
+  const kids        = D.family.members.filter(m=>m.role==='kid'&&!m.deleted);
+  const pending     = pendingApprovals();
+  const pendingSpend = pendingSpendRequests();
+  const cur         = D.settings.currency || '$';
+  const t           = today();
 
-  // Pending approvals
+  // Pending approvals (chores + savings spend requests)
   let html = '';
-  if (pending.length > 0) {
+  if (pending.length > 0 || pendingSpend.length > 0) {
     html += `<div class="card" style="border:2px solid var(--yellow)">
       <div class="card-title"><i class="ph-duotone ph-hourglass" style="color:#3B82F6;font-size:1rem;vertical-align:middle"></i> Needs Approval</div>`;
     pending.forEach(({chore, memberId, entry}) => {
@@ -6287,6 +6458,23 @@ function renderParentHome() {
           <div class="admin-actions" style="align-self:flex-start">
             <button class="btn-icon-sm btn-icon-approve" onclick="approveChore('${chore.id}','${memberId}','${entry.id}')"><i class="ph-duotone ph-check" style="color:#16A34A;font-size:1rem"></i></button>
             <button class="btn-icon-sm btn-icon-reject"  onclick="rejectChore('${chore.id}','${memberId}','${entry.id}')"><i class="ph-duotone ph-x" style="font-size:0.9rem"></i></button>
+          </div>
+        </div>`;
+    });
+    pendingSpend.forEach(req => {
+      const mem = getMember(req.memberId);
+      if (!mem) return;
+      html += `
+        <div class="admin-card" style="flex-wrap:wrap;gap:10px">
+          <span class="admin-icon"><i class="ph-duotone ph-shopping-cart" style="color:#6C63FF;font-size:1.6rem"></i></span>
+          <div class="admin-info" style="flex:1;min-width:0">
+            <div class="admin-name">Spend Request <span style="background:#EDE9FE;color:var(--purple);border-radius:6px;padding:2px 8px;font-size:0.75rem;font-weight:700;margin-left:6px">${cur}${req.amount.toFixed(2)}</span></div>
+            <div class="admin-meta">${mem.avatar} ${esc(mem.name)}${req.reason ? ` · "${esc(req.reason)}"` : ''} · ${fmtDate(req.date)}</div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-top:2px">Balance: ${cur}${(mem.savings||0).toFixed(2)}</div>
+          </div>
+          <div class="admin-actions" style="align-self:flex-start">
+            <button class="btn-icon-sm btn-icon-approve" onclick="approveSavingsRequest('${req.id}')"><i class="ph-duotone ph-check" style="color:#16A34A;font-size:1rem"></i></button>
+            <button class="btn-icon-sm btn-icon-reject"  onclick="denySavingsRequest('${req.id}')"><i class="ph-duotone ph-x" style="font-size:0.9rem"></i></button>
           </div>
         </div>`;
     });
@@ -7790,6 +7978,7 @@ function init() {
           savePendingSnapshot(rememberedUser.id);
           markBonusesSeen(rememberedUser.id);
           markSavingsSeen(rememberedUser.id);
+          markSpendOutcomesSeen(rememberedUser.id);
         }
       } else {
         renderHome();
