@@ -3788,13 +3788,19 @@ function tryBiometricUnlock() {
 }
 
 // ── SETUP WIZARD ──────────────────────────────────────────────
-const SETUP_STEPS_NEW  = ['welcome','members','chores','prizes','sync','done'];
-const SETUP_STEPS_EDIT = ['welcome','members','sync','done'];
+const SETUP_STEPS_NEW  = ['welcome','parents','members','chores','prizes','sync','done'];
+const SETUP_STEPS_EDIT = ['welcome','parents','members','sync','done'];
 let SETUP_STEPS = SETUP_STEPS_NEW;
 
 function goSetup() {
   SETUP_STEPS    = D.setup ? SETUP_STEPS_EDIT : SETUP_STEPS_NEW;
   S.setupStep    = 0;
+  S.setupParents = D.family.members
+    .filter(m => m.role === 'parent')
+    .map(m => ({...m}));
+  if (S.setupParents.length === 0) {
+    S.setupParents = [{ id:genId(), name:'', avatar:'🧑', color:'#6C63FF', role:'parent', diamonds:0, savings:0, totalEarned:0, birthday:'' }];
+  }
   // All non-parent members in one unified list
   S.setupMembers = D.family.members
     .filter(m => m.role !== 'parent')
@@ -3824,6 +3830,20 @@ function renderSetupStep() {
         <input type="text" id="setup-family-name" placeholder="The Smiths" value="${esc(D.family.name||'')}">
       </div>
       <button class="btn btn-primary btn-full" onclick="setupNext()">Let's go →</button>`;
+      break;
+
+    case 'parents': content = `
+      <div class="setup-top" style="padding-top:20px">
+        <div class="setup-emoji"><i class="ph-duotone ph-shield-star" style="color:#6C63FF;font-size:3rem"></i></div>
+        <div class="setup-title">Parents</div>
+        <div class="setup-sub">Customize the parent profiles. You can have more than one!</div>
+      </div>
+      <div id="parents-list">${S.setupParents.map((p,i)=>parentSetupCard(p,i)).join('')}</div>
+      <button class="btn btn-secondary btn-full mt-8" onclick="addParentCard()" style="margin-bottom:14px">+ Add another parent</button>
+      <div class="flex gap-10 mt-8">
+        <button class="btn btn-secondary" style="flex:0 0 80px" onclick="setupBack()">← Back</button>
+        <button class="btn btn-primary" style="flex:1" onclick="setupNext()">Next →</button>
+      </div>`;
       break;
 
     case 'members': content = `
@@ -3998,6 +4018,47 @@ function memberSetupCard(mem, i) {
     </div>`;
 }
 
+function parentSetupCard(p, i) {
+  const avatarOpts = AVATARS.slice(0,24).map(a =>
+    `<div class="avatar-opt${a===p.avatar?' sel':''}" onclick="setParentField(${i},'avatar','${a}',true)">${a}</div>`
+  ).join('');
+  const colorSwatches = COLORS.map(c =>
+    `<div class="color-swatch${c===p.color?' sel':''}" style="background:${c}" onclick="setParentField(${i},'color','${c}',true)"></div>`
+  ).join('');
+  const [bdMm, bdDd] = (p.birthday||'').split('-');
+  const monthSel = `<select id="pbday-m-${i}" onchange="setParentBday(${i})">
+    <option value="">Month</option>
+    ${MONTHS.map((mn,idx)=>`<option value="${String(idx+1).padStart(2,'0')}" ${bdMm===String(idx+1).padStart(2,'0')?'selected':''}>${mn}</option>`).join('')}
+  </select>`;
+  const daySel = `<select id="pbday-d-${i}" onchange="setParentBday(${i})">
+    <option value="">Day</option>
+    ${Array.from({length:31},(_,n)=>n+1).map(d=>`<option value="${String(d).padStart(2,'0')}" ${bdDd===String(d).padStart(2,'0')?'selected':''}>${d}</option>`).join('')}
+  </select>`;
+  return `
+    <div class="kid-setup-card" id="parent-card-${i}">
+      <div class="kid-setup-card-header">
+        <span style="font-size:1.5rem;font-weight:700">${p.avatar||'🧑'} Parent ${i+1}</span>
+        ${S.setupParents.length > 1 ? `<button class="btn-icon-sm btn-icon-delete" onclick="removeParentCard(${i})"><i class="ph-duotone ph-x" style="font-size:0.9rem"></i></button>` : ''}
+      </div>
+      <div class="form-group">
+        <label class="form-label">Name</label>
+        <input type="text" id="pname-${i}" placeholder="Name" value="${esc(p.name||'')}">
+      </div>
+      <div class="form-group">
+        <label class="form-label"><i class="ph-duotone ph-cake" style="color:#F97316;font-size:1rem;vertical-align:middle"></i> Birthday <span class="form-label-hint">for surprise animations!</span></label>
+        <div class="input-row">${monthSel}${daySel}</div>
+      </div>
+      <div class="form-group mt-8">
+        <label class="form-label">Avatar</label>
+        <div class="avatar-grid">${avatarOpts}</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Color</label>
+        <div class="color-row">${colorSwatches}</div>
+      </div>
+    </div>`;
+}
+
 // Unified member card helpers
 function addMemberCard() {
   const defaults = ['🦁','🐯','🐻','🐼','👵','🌸'];
@@ -4025,6 +4086,27 @@ function setMemberBday(i) {
   if (S.setupMembers[i]) S.setupMembers[i].birthday = (mm && dd) ? `${mm}-${dd}` : '';
 }
 
+function addParentCard() {
+  const i = S.setupParents.length;
+  const parentColors = ['#6C63FF','#FF6584','#43D9AD','#FF9A3C'];
+  const parentAvatars = ['🧑','👩','👨','🧔'];
+  S.setupParents.push({ id:genId(), name:'', avatar:parentAvatars[i % parentAvatars.length], color:parentColors[i % parentColors.length], role:'parent', diamonds:0, savings:0, totalEarned:0, birthday:'' });
+  renderSetupStep();
+}
+
+function removeParentCard(i) { S.setupParents.splice(i,1); renderSetupStep(); }
+
+function setParentField(i, field, value, rerender=false) {
+  if (S.setupParents[i]) S.setupParents[i][field] = value;
+  if (rerender) renderSetupStep();
+}
+
+function setParentBday(i) {
+  const mm = document.getElementById(`pbday-m-${i}`)?.value;
+  const dd = document.getElementById(`pbday-d-${i}`)?.value;
+  if (S.setupParents[i]) S.setupParents[i].birthday = (mm && dd) ? `${mm}-${dd}` : '';
+}
+
 function setupNext() {
   const stepName = SETUP_STEPS[S.setupStep];
 
@@ -4032,6 +4114,15 @@ function setupNext() {
     const name = document.getElementById('setup-family-name')?.value.trim();
     if (!name) { toast('Please enter a family name'); return; }
     D.family.name = name;
+  }
+
+  if (stepName === 'parents') {
+    S.setupParents.forEach((p,i) => {
+      const ni = document.getElementById(`pname-${i}`);
+      if (ni) p.name = ni.value.trim();
+      setParentBday(i);
+    });
+    if (S.setupParents.some(p=>!p.name)) { toast('Every parent needs a name'); return; }
   }
 
   if (stepName === 'members') {
@@ -4099,8 +4190,11 @@ function setupBack() {
 }
 
 function finishSetup() {
-  const parent = D.family.members.find(m=>m.role==='parent') ||
-                 { id:genId(), name:'Parent', avatar:'🧑', color:'#6C63FF', role:'parent', diamonds:0, savings:0, totalEarned:0 };
+  // Merge parents — preserve existing data (diamonds, etc.), apply setup edits
+  const mergedParents = S.setupParents.map(p => {
+    const existing = D.family.members.find(x=>x.id===p.id) || {};
+    return { ...existing, ...p, role:'parent' };
+  });
 
   // Derive role from displayMode, preserve existing diamonds/savings
   const mergedMembers = S.setupMembers.map(m => {
@@ -4109,7 +4203,7 @@ function finishSetup() {
     return { ...existing, ...m, role };
   });
 
-  D.family.members = [parent, ...mergedMembers];
+  D.family.members = [...mergedParents, ...mergedMembers];
 
   // Assign orphaned chores to all kid members
   const kidIds = mergedMembers.map(m=>m.id);
