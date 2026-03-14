@@ -2001,6 +2001,7 @@ function checkForSavingsRequestOutcomes(member, isWhileAway = false) {
         : '<i class="ph-duotone ph-x-circle" style="color:#9CA3AF"></i> Not This Time',
       sub:        `Your spend request for ${sub} wasn't approved.`,
       noAnimation: true,
+      btnLabel:   'Okay',
       tts:        tiny ? `Your grown-up said not right now for spending ${cur}${r.amount.toFixed(2)}.` : null,
       onClose:    () => {},
     });
@@ -3692,7 +3693,7 @@ function _showNextCelebration() {
   _renderCelebration(_celebQueue.shift());
 }
 
-function _renderCelebration({ icon='💎', title='Great job!', sub='', diamonds=null, dollars=null, cur='$', noAnimation=false, tts=null, onClose=null }) {
+function _renderCelebration({ icon='💎', title='Great job!', sub='', diamonds=null, dollars=null, cur='$', noAnimation=false, btnLabel=null, tts=null, onClose=null }) {
   const root = document.getElementById('celebration-root');
   const ptsHtml = diamonds !== null
     ? `<div class="cel-diamonds">+${diamonds} 💎</div>`
@@ -3712,7 +3713,7 @@ function _renderCelebration({ icon='💎', title='Great job!', sub='', diamonds=
         ${sub ? `<div class="cel-sub">${sub}</div>` : ''}
         ${ptsHtml}
         ${moreHtml}
-        <button class="btn btn-primary btn-full" onclick="closeCelebration()">Yay! <i class="ph-duotone ph-confetti" style="font-size:1rem;vertical-align:middle"></i></button>
+        <button class="btn btn-primary btn-full" onclick="closeCelebration()">${btnLabel ?? 'Yay! <i class="ph-duotone ph-confetti" style="font-size:1rem;vertical-align:middle"></i>'}</button>
       </div>
     </div>`;
 
@@ -3796,6 +3797,7 @@ function testSpendDenied() {
     title:       '<i class="ph-duotone ph-x-circle" style="color:#9CA3AF"></i> Not This Time',
     sub:         'Your spend request for "Video game" — $60.00 wasn\'t approved.',
     noAnimation: true,
+    btnLabel:    'Okay',
     onClose:     () => {},
   });
 }
@@ -5565,6 +5567,7 @@ function renderKidDiamonds() {
         <div class="savings-label">Keep saving!</div>
         <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
           <button class="btn btn-secondary btn-sm" onclick="showSavingsModal('${m.id}');event.stopPropagation()">+ Add Savings</button>
+          <button class="btn btn-sm" style="background:#F3F4F6;color:#6B7280" onclick="showSavingsHistory('${m.id}');event.stopPropagation()"><i class="ph-duotone ph-clock-clockwise" style="font-size:0.9rem;vertical-align:middle"></i> History</button>
           ${(function(){
             const hasPending = (D.savingsRequests||[]).some(r=>r.memberId===m.id&&r.status==='pending');
             if (hasPending) return `<button class="btn btn-sm" style="background:#FEF3C7;color:#92400E;pointer-events:none" onclick="event.stopPropagation()"><i class="ph-duotone ph-hourglass" style="font-size:0.9rem;vertical-align:middle"></i> Request Pending</button>`;
@@ -5673,6 +5676,53 @@ function denySavingsRequest(requestId) {
   saveData();
   toast(`Spend request denied for ${m?.name || 'kid'}`);
   renderParentHome(); renderParentHeader(); renderParentNav();
+}
+
+function showSavingsHistory(memberId) {
+  const m = getMember(memberId);
+  if (!m) return;
+  const cur = D.settings.currency || '$';
+  const savTypes = new Set(['savings', 'savings_deposit', 'savings_withdraw']);
+  const entries = (D.history || []).filter(h => h.memberId === memberId && savTypes.has(h.type));
+
+  const savingsIcon = (h) => {
+    if (h.type === 'savings_deposit')  return '<i class="ph-duotone ph-arrow-circle-down" style="color:#2563EB"></i>';
+    if (h.type === 'savings_withdraw') return '<i class="ph-duotone ph-shopping-bag" style="color:#6C63FF"></i>';
+    const t = (h.title || '').toLowerCase();
+    if (t.includes('interest'))   return '<i class="ph-duotone ph-trend-up" style="color:#16A34A"></i>';
+    if (t.includes('match'))      return '<i class="ph-duotone ph-handshake" style="color:#0E7490"></i>';
+    if (t.includes('converted'))  return '<i class="ph-duotone ph-arrows-left-right" style="color:#7C3AED"></i>';
+    return '<i class="ph-duotone ph-piggy-bank" style="color:#16A34A"></i>';
+  };
+
+  const rows = entries.length === 0
+    ? '<div style="color:#9CA3AF;font-size:0.9rem;padding:12px 0;text-align:center">No savings activity yet</div>'
+    : entries.map(h => {
+        const isDeposit  = h.type === 'savings_deposit';
+        const isWithdraw = h.type === 'savings_withdraw';
+        const hasDollars = (h.dollars || 0) > 0;
+        const amtHtml = hasDollars
+          ? `<div style="font-weight:700;font-size:0.9rem;color:${isWithdraw?'#6C63FF':'#16A34A'};white-space:nowrap">${isWithdraw?'−':'+'}${cur}${h.dollars.toFixed(2)}</div>`
+          : h.diamonds !== 0
+            ? `<div style="font-weight:700;font-size:0.9rem;color:${h.diamonds>0?'#D97706':'#6B7280'};white-space:nowrap">${h.diamonds>0?'+':''}${h.diamonds} 💎</div>`
+            : '';
+        return `
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f3f4f6">
+            <span style="font-size:1.3rem;flex-shrink:0">${savingsIcon(h)}</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:0.88rem;font-weight:600">${esc(h.title||'')}</div>
+              <div style="font-size:0.75rem;color:#9CA3AF">${fmtDate(h.date)}</div>
+            </div>
+            ${amtHtml}
+          </div>`;
+      }).join('');
+
+  showModal(`
+    <div class="modal-title"><i class="ph-duotone ph-piggy-bank" style="color:#16A34A;font-size:1.2rem;vertical-align:middle"></i> Savings History — ${esc(m.name)}</div>
+    <div style="max-height:60vh;overflow-y:auto;margin:-4px 0 8px">${rows}</div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary btn-full" onclick="closeModal()">Close</button>
+    </div>`);
 }
 
 function showSavingsModal(memberId) {
@@ -6060,11 +6110,13 @@ function buildMemberStats(member) {
   normalizeMember(member);
 
   // Chore history breakdown
-  const choreHist  = hist.filter(h => h.type === 'chore');
-  const prizeHist  = hist.filter(h => h.type === 'prize');
-  const penaltyHist = hist.filter(h => h.type === 'penalty');
-  const bonusHist  = hist.filter(h => h.type === 'bonus');
-  const levelHist  = hist.filter(h => h.type === 'level');
+  const choreHist    = hist.filter(h => h.type === 'chore');
+  const prizeHist    = hist.filter(h => h.type === 'prize');
+  const penaltyHist  = hist.filter(h => h.type === 'penalty');
+  const bonusHist    = hist.filter(h => h.type === 'bonus');
+  const levelHist    = hist.filter(h => h.type === 'level');
+  const savDepHist   = hist.filter(h => h.type === 'savings_deposit');
+  const savWithHist  = hist.filter(h => h.type === 'savings_withdraw');
 
   // Per-chore counts
   const choreCount = {};
@@ -6114,6 +6166,8 @@ function buildMemberStats(member) {
     bestComboStreak:  member.comboStreak?.best || 0,
     currentComboStreak: member.comboStreak?.current || 0,
     savings:          member.savings || 0,
+    totalDeposited:   savDepHist.reduce((s, h) => s + (h.dollars || 0), 0),
+    totalWithdrawn:   savWithHist.reduce((s, h) => s + (h.dollars || 0), 0),
     comboCount:       bonusHist.length,
     comboDiamonds:       bonusHist.reduce((s,h) => s + Math.abs(h.diamonds||0), 0),
     levelUps:         Math.max(levelHist.length, lvlInfo.current.level - 1),
@@ -6196,11 +6250,23 @@ function renderFamilyStatsCard(kids) {
     : totalNlSecs < 60 ? `${totalNlSecs}s`
     : `${Math.floor(totalNlSecs / 60)}m ${totalNlSecs % 60}s`;
 
+  const cur = D.settings.currency || '$';
+  const savOn = D.settings.savingsEnabled !== false;
+  const familyBalance   = kids.reduce((s, k) => s + (k.savings || 0), 0);
+  const familyDeposited = (D.history || []).filter(h => kids.some(k=>k.id===h.memberId) && h.type==='savings_deposit').reduce((s,h)=>s+(h.dollars||0),0);
+  const familyWithdrawn = (D.history || []).filter(h => kids.some(k=>k.id===h.memberId) && h.type==='savings_withdraw').reduce((s,h)=>s+(h.dollars||0),0);
+
   const overviewSection = _statSection('Family Overview',
     _statTile('<i class="ph-duotone ph-check-circle" style="color:#16A34A"></i>', 'Chores Done', totalChores, '#166534', 'all time, all kids') +
     _statTile('<i class="ph-duotone ph-diamond" style="color:#D97706"></i>', 'Diamonds Earned', totalDiamonds, '#92400e', 'all time, all kids') +
     _statTile('<i class="ph-duotone ph-gift" style="color:#1D4ED8"></i>', 'Prizes Redeemed', totalPrizes, '#1e40af', 'all time, all kids')
   );
+
+  const savingsOverview = savOn ? _statSection('Family Savings',
+    _statTile('<i class="ph-duotone ph-piggy-bank" style="color:#16A34A"></i>', 'Total Balance', `${cur}${familyBalance.toFixed(2)}`, '#166534', 'across all kids') +
+    _statTile('<i class="ph-duotone ph-arrow-circle-down" style="color:#2563EB"></i>', 'Total Deposited', `${cur}${familyDeposited.toFixed(2)}`, '#1e40af', 'all time') +
+    _statTile('<i class="ph-duotone ph-shopping-bag" style="color:#6C63FF"></i>', 'Total Spent', `${cur}${familyWithdrawn.toFixed(2)}`, '#4c1d95', 'from savings')
+  ) : '';
 
   const funTiles =
     (D.settings.streakEnabled !== false
@@ -6235,7 +6301,7 @@ function renderFamilyStatsCard(kids) {
         </div>
         ${caret}
       </div>
-      ${isExpanded ? `${overviewSection}${funSection}` : ''}
+      ${isExpanded ? `${overviewSection}${savingsOverview}${funSection}` : ''}
     </div>`;
 }
 
@@ -6260,8 +6326,15 @@ function renderMemberStatsCard(member, collapse) {
   const rewardSection = _statSection('Rewards & Combos',
     _statTile('<i class="ph-duotone ph-gift" style="color:#1D4ED8"></i>','Prizes Won', s.rewardCount, '#1e40af', '', tts(`You have won ${s.rewardCount} prize${s.rewardCount !== 1 ? 's' : ''}.`)) +
     _statTile('<i class="ph-duotone ph-lightning" style="color:#F59E0B"></i>','Combos Hit', s.comboCount, '#b45309', `+${s.comboDiamonds} bonus 💎`, tts(`You have hit ${s.comboCount} combo${s.comboCount !== 1 ? 's' : ''}.`)) +
-    (D.settings.savingsEnabled !== false ? _statTile('<i class="ph-duotone ph-piggy-bank" style="color:#16A34A"></i>','Saved Up', `${D.settings.currency||'$'}${(s.savings||0).toFixed(2)}`, '#166534', '', tts(`You have saved up ${D.settings.currency||'$'}${(s.savings||0).toFixed(2)}.`)) : '')
+    _statTile('<i class="ph-duotone ph-shopping-cart" style="color:#374151"></i>','💎 Spent', s.diamondsSpent, '#374151', 'on prizes', tts(`You have spent ${s.diamondsSpent} diamonds on prizes.`))
   );
+
+  const cur = D.settings.currency || '$';
+  const savingsSection = D.settings.savingsEnabled !== false ? _statSection('Savings Jar',
+    _statTile('<i class="ph-duotone ph-piggy-bank" style="color:#16A34A"></i>', 'Balance', `${cur}${(s.savings||0).toFixed(2)}`, '#166534', 'current', tts(`You have ${cur}${(s.savings||0).toFixed(2)} in savings.`)) +
+    _statTile('<i class="ph-duotone ph-arrow-circle-down" style="color:#2563EB"></i>', 'Total Deposited', `${cur}${(s.totalDeposited||0).toFixed(2)}`, '#1e40af', 'all time') +
+    _statTile('<i class="ph-duotone ph-shopping-bag" style="color:#6C63FF"></i>', 'Total Spent', `${cur}${(s.totalWithdrawn||0).toFixed(2)}`, '#4c1d95', 'from savings')
+  ) : '';
 
   // Build chore badge display
   const choreBadgeKeys = (member.badges||[]).filter(b => b.startsWith('cb_'));
@@ -6306,7 +6379,7 @@ function renderMemberStatsCard(member, collapse) {
   const extraSection = _statSection('Fun Facts',
     _statTile('<i class="ph-duotone ph-calendar-star" style="color:#D97706"></i>','Best Day', s.bestDate ? `${s.bestDate.dmds} 💎` : '—', '#d97706', bestDaySub, tts(s.bestDate ? `Your best day was ${s.bestDate.dmds} diamonds.` : `No best day yet.`)) +
     _statTile('<i class="ph-duotone ph-heart" style="color:#DB2777"></i>','Fav Chore', s.favChore ? `${s.favChore[0].split(' ')[0]}` : '—', '#db2777', favChoreSub, tts(s.favChore ? `Your favorite chore is ${s.favChore[0]}.` : `No favorite chore yet.`)) +
-    _statTile('<i class="ph-duotone ph-shopping-cart" style="color:#374151"></i>','💎 Spent', s.diamondsSpent, '#374151', 'on prizes', tts(`You have spent ${s.diamondsSpent} diamonds on prizes.`))
+    _statTile('<i class="ph-duotone ph-arrow-u-down-left" style="color:#6B7280"></i>','Declined', s.penaltyCount > 0 ? s.penaltyCount : (hist.filter(h=>h.type==='decline').length), '#374151', 'chores declined', '')
   );
 
   // Chore breakdown table
@@ -6353,6 +6426,7 @@ function renderMemberStatsCard(member, collapse) {
       ${choresSection}
       ${levelSection}
       ${rewardSection}
+      ${savingsSection}
       ${badgeSection}
       ${choreBadgeGrid}
       ${penaltySection}
