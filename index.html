@@ -5175,22 +5175,30 @@ function renderKidDiamonds() {
     const interest     = m.savingsInterest || 0;
     const selfSaved    = Math.max(0, sav - matched - interest);
     const matchPct     = D.settings.savingsMatchPercent || 50;
-    const hasBreakdown = (matchOn && matched > 0) || (interestOn && interest > 0);
-    const breakdownHtml = hasBreakdown
-      ? `<div style="font-size:0.78rem;opacity:0.85;margin-bottom:12px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+    const interestRate   = D.settings.savingsInterestRate || 5;
+    const interestPeriod = D.settings.savingsInterestPeriod || 'monthly';
+    const interestTip    = interestPeriod === 'weekly' ? 'added every Monday' : 'added monthly on the 1st';
+    const hasBreakdown   = (matchOn && matched > 0) || (interestOn && interest > 0);
+    const breakdownHtml  = hasBreakdown
+      ? `<div style="font-size:0.78rem;opacity:0.85;margin-bottom:6px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
            <span>💰 ${cur}${selfSaved.toFixed(2)} yours</span>
            ${matched > 0 ? `<span>🤝 ${cur}${matched.toFixed(2)} matched</span>` : ''}
            ${interest > 0 ? `<span>📈 ${cur}${interest.toFixed(2)} interest</span>` : ''}
          </div>`
-      : matchOn
-        ? `<div style="font-size:0.78rem;opacity:0.75;margin-bottom:12px">🤝 ${matchPct}% parent match active</div>`
-        : '';
+      : '';
+    const tipsHtml = (matchOn || interestOn)
+      ? `<div style="font-size:0.75rem;opacity:0.7;margin-bottom:12px;display:flex;flex-direction:column;gap:2px;align-items:center">
+           ${matchOn ? `<span>🤝 ${matchPct}% parent match active</span>` : ''}
+           ${interestOn ? `<span>📈 ${interestRate}% interest ${interestTip}</span>` : ''}
+         </div>`
+      : '';
     const _savTts = tiny ? ` onclick="speak('You have ${_savSpeech} in savings.${matchOn && matched > 0 ? ` Your parents have matched ${cur}${matched.toFixed(2)}.` : ''}${interestOn && interest > 0 ? ` You have earned ${cur}${interest.toFixed(2)} in interest.` : ''}')"` : '';
     html += `
       <div class="savings-card"${_savTts}>
         <div style="font-size:0.9rem;opacity:0.85;margin-bottom:4px"><i class="ph-duotone ph-piggy-bank" style="font-size:1rem;vertical-align:middle"></i> My Savings Jar</div>
         <div class="savings-amount">${cur}${sav.toFixed(2)}</div>
         ${breakdownHtml}
+        ${tipsHtml}
         <div class="savings-label">Keep saving!</div>
         <button class="btn btn-secondary btn-sm" onclick="showSavingsModal('${m.id}');event.stopPropagation()">+ Add Savings</button>
       </div>`;
