@@ -6168,6 +6168,7 @@ function buildMemberStats(member) {
     savings:          member.savings || 0,
     totalDeposited:   savDepHist.reduce((s, h) => s + (h.dollars || 0), 0),
     totalWithdrawn:   savWithHist.reduce((s, h) => s + (h.dollars || 0), 0),
+    declineCount:     hist.filter(h => h.type === 'decline').length,
     comboCount:       bonusHist.length,
     comboDiamonds:       bonusHist.reduce((s,h) => s + Math.abs(h.diamonds||0), 0),
     levelUps:         Math.max(levelHist.length, lvlInfo.current.level - 1),
@@ -6379,7 +6380,7 @@ function renderMemberStatsCard(member, collapse) {
   const extraSection = _statSection('Fun Facts',
     _statTile('<i class="ph-duotone ph-calendar-star" style="color:#D97706"></i>','Best Day', s.bestDate ? `${s.bestDate.dmds} 💎` : '—', '#d97706', bestDaySub, tts(s.bestDate ? `Your best day was ${s.bestDate.dmds} diamonds.` : `No best day yet.`)) +
     _statTile('<i class="ph-duotone ph-heart" style="color:#DB2777"></i>','Fav Chore', s.favChore ? `${s.favChore[0].split(' ')[0]}` : '—', '#db2777', favChoreSub, tts(s.favChore ? `Your favorite chore is ${s.favChore[0]}.` : `No favorite chore yet.`)) +
-    _statTile('<i class="ph-duotone ph-arrow-u-down-left" style="color:#6B7280"></i>','Declined', s.penaltyCount > 0 ? s.penaltyCount : (hist.filter(h=>h.type==='decline').length), '#374151', 'chores declined', '')
+    _statTile('<i class="ph-duotone ph-arrow-u-down-left" style="color:#6B7280"></i>','Declined', s.declineCount, '#374151', 'chores declined', '')
   );
 
   // Chore breakdown table
