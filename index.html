@@ -2458,6 +2458,7 @@ function doRejectChore(choreId, memberId, entryId) {
   if (!chore) return;
   chore.completions[memberId] = normalizeCompletionEntries(chore.completions[memberId]).filter(entry => entry.id !== entryId);
   if (!chore.completions[memberId].length) delete chore.completions[memberId];
+  addHistory('decline', memberId, chore.title, 0);
   saveData();
 }
 
@@ -5508,6 +5509,83 @@ function _statBreakdownTable(rows, col1, col2) {
   </table>`;
 }
 
+function renderFamilyStatsCard(kids) {
+  const allHist = (D.history || []).filter(h => kids.some(k => k.id === h.memberId));
+  const choreHist   = allHist.filter(h => h.type === 'chore');
+  const declineHist = allHist.filter(h => h.type === 'decline');
+
+  // Overview totals
+  const totalChores  = choreHist.length;
+  const totalDiamonds = kids.reduce((s, k) => s + (k.totalEarned || 0), 0);
+  const totalPrizes  = D.prizes.reduce((s, p) => s + (p.redemptions || []).length, 0);
+
+  // Streaks
+  const kidsOnStreak = kids.filter(k => (k.streak?.current || 0) > 0).length;
+
+  // Most popular chore
+  const choreCounts = {};
+  choreHist.forEach(h => { choreCounts[h.title] = (choreCounts[h.title] || 0) + 1; });
+  const topChore = Object.entries(choreCounts).sort((a, b) => b[1] - a[1])[0];
+
+  // Best single day (most diamonds earned across any kid)
+  const dmByDate = {};
+  choreHist.forEach(h => { dmByDate[h.date] = (dmByDate[h.date] || 0) + (h.diamonds || 0); });
+  const bestDay = Object.entries(dmByDate).sort((a, b) => b[1] - a[1])[0];
+
+  // Favorite prize
+  const prizeCounts = {};
+  D.prizes.forEach(p => {
+    const n = (p.redemptions || []).length;
+    if (n > 0) prizeCounts[p.title] = { n, icon: p.icon || '🎁' };
+  });
+  const topPrize = Object.entries(prizeCounts).sort((a, b) => b[1].n - a[1].n)[0];
+
+  // Total NL time
+  const totalNlSecs = kids.reduce((s, k) => s + (k.nlLifetimeSecs || 0), 0);
+  const nlFmt = totalNlSecs === 0 ? '—'
+    : totalNlSecs < 60 ? `${totalNlSecs}s`
+    : `${Math.floor(totalNlSecs / 60)}m ${totalNlSecs % 60}s`;
+
+  const overviewSection = _statSection('Family Overview',
+    _statTile('<i class="ph-duotone ph-check-circle" style="color:#16A34A"></i>', 'Chores Done', totalChores, '#166534', 'all time, all kids') +
+    _statTile('<i class="ph-duotone ph-diamond" style="color:#D97706"></i>', 'Diamonds Earned', totalDiamonds, '#92400e', 'all time, all kids') +
+    _statTile('<i class="ph-duotone ph-gift" style="color:#1D4ED8"></i>', 'Prizes Redeemed', totalPrizes, '#1e40af', 'all time, all kids')
+  );
+
+  const funTiles =
+    (D.settings.streakEnabled !== false
+      ? _statTile('<i class="ph-duotone ph-fire" style="color:#F97316"></i>', 'Active Streaks', kidsOnStreak, '#b45309', `kid${kidsOnStreak !== 1 ? 's' : ''} on a streak now`)
+      : '') +
+    (topChore
+      ? _statTile('<i class="ph-duotone ph-star" style="color:#7C3AED"></i>', 'Most Popular Chore', topChore[0].split(' ')[0], '#4c1d95', `${topChore[0]} · ${topChore[1]}×`)
+      : '') +
+    (topPrize
+      ? _statTile(`<span style="font-size:1.6rem">${topPrize[1].icon}</span>`, 'Fav Prize', topPrize[1].n + '×', '#1e40af', topPrize[0])
+      : '') +
+    (bestDay
+      ? _statTile('<i class="ph-duotone ph-calendar-star" style="color:#D97706"></i>', 'Best Family Day', `${bestDay[1]} 💎`, '#d97706', fmtDate(bestDay[0]))
+      : '') +
+    _statTile('<i class="ph-duotone ph-arrow-u-down-left" style="color:#6B7280"></i>', 'Chores Declined', declineHist.length, '#374151', 'by parents, all time') +
+    (D.settings.notListeningEnabled !== false
+      ? _statTile('<i class="ph-duotone ph-speaker-slash" style="color:#991B1B"></i>', 'Not-Listening Time', nlFmt, '#991b1b', 'total across all kids')
+      : '');
+
+  const funSection = funTiles.trim() ? _statSection('Fun Facts', funTiles) : '';
+
+  return `
+    <div class="card" style="border-top:4px solid #6C63FF;padding:20px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
+        <span style="font-size:2rem">👨‍👩‍👧‍👦</span>
+        <div>
+          <div style="font-size:1.1rem;font-weight:800">${esc(D.family.name || 'The Family')}</div>
+          <div style="font-size:0.85rem;color:#6b7280">${kids.length} kid${kids.length !== 1 ? 's' : ''} · all-time combined stats</div>
+        </div>
+      </div>
+      ${overviewSection}
+      ${funSection}
+    </div>`;
+}
+
 function renderMemberStatsCard(member, collapse) {
   // collapse = { isExpanded: bool, toggleFn: string } | null (null = always expanded, no toggle)
   const s = buildMemberStats(member);
@@ -5646,6 +5724,7 @@ function renderStatsPage(container) {
     if (kids.length === 0) {
       html += `<div class="empty-state"><div class="empty-icon"><i class="ph-duotone ph-smiley" style="color:#9CA3AF;font-size:3rem"></i></div><div class="empty-text">No kids added yet</div></div>`;
     } else {
+      html += renderFamilyStatsCard(kids);
       kids.forEach(kid => {
         const isExpanded = _expandedStatsKids.has(kid.id);
         html += renderMemberStatsCard(kid, { isExpanded, toggleFn: `toggleStatsKid('${kid.id}')` });
