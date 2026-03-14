@@ -5225,7 +5225,7 @@ function renderKidDiamonds() {
         <div class="history-item"${_histTts}>
           <span class="history-icon">${historyIcon(h)}</span>
           <div class="history-info">
-            <div class="history-title">${esc(h.title)}</div>
+            <div class="history-title">${esc((h.title||'').replace(/^⚡\s*/,''))}</div>
             <div class="history-date">${fmtDate(h.date)}</div>
           </div>
           ${dmdsDisplay}
@@ -6163,7 +6163,7 @@ function renderParentHome() {
       return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #f3f4f6">
         <span style="background:${badge.bg};color:${badge.color};border-radius:8px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:0.85rem;flex-shrink:0">${icon}</span>
         <div style="flex:1;min-width:0">
-          <div style="font-weight:600;font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(h.title)}</div>
+          <div style="font-weight:600;font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc((h.title||'').replace(/^⚡\s*/,''))}</div>
           <div style="font-size:0.77rem;color:var(--muted)">${mem ? `${mem.avatar} ${esc(mem.name)}` : '<span style="font-style:italic">Former member</span>'} · ${fmtDate(h.date)}</div>
         </div>
         ${ptsStr ? `<span style="font-weight:700;color:${ptsColor};font-size:0.9rem;white-space:nowrap">${ptsStr}</span>` : ''}
