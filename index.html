@@ -3242,6 +3242,7 @@ function addShOverride() {
 }
 
 function removeShOverride(date) {
+  if (!confirm(`Remove the exception for ${date}?`)) return;
   const member = getMember(S.shMemberId);
   if (!member) return;
   delete member.splitHousehold.overrides[date];
@@ -5754,7 +5755,7 @@ function renderKidDiamonds() {
       const def = getBaseBadgeDef(b.id);
       const have = earned.includes(b.id);
       const badgeTts = tiny ? ` onclick="speak('${def.name.replace(/'/g,"\\'")}')"` : '';
-      return `<div class="badge-chip ${have?'earned':'badge-chip-locked'}" title="${esc(def.desc)}"${badgeTts}>
+      return `<div class="badge-chip ${have?'earned':'badge-chip-locked'}"${badgeTts}>
         <span class="badge-chip-icon">${def.icon}</span>${esc(def.name)}
       </div>`;
     }).join('');
@@ -5765,7 +5766,7 @@ function renderKidDiamonds() {
         const have = earned.includes(key);
         if (!have && b.secret) return '';
         const badgeTts = tiny ? ` onclick="speak('${(b.name||'').replace(/'/g,"\\'")}')"` : '';
-        return `<div class="badge-chip ${have?'earned':'badge-chip-locked'}" title="${esc(chore.title)} × ${b.count}"${badgeTts}>
+        return `<div class="badge-chip ${have?'earned':'badge-chip-locked'}"${badgeTts}>
           <span class="badge-chip-icon">${b.icon||'🏅'}</span>${esc(b.name||'')}
         </div>`;
       })
@@ -6353,8 +6354,8 @@ function renderParentTab() {
 }
 
 // ── LIFETIME STATS ────────────────────────────────────────────
-function buildMemberStats(member) {
-  const hist = (D.history || []).filter(h => h.memberId === member.id);
+function buildMemberStats(member, histIdx) {
+  const hist = histIdx ? (histIdx.get(member.id) || []) : (D.history || []).filter(h => h.memberId === member.id);
   normalizeMember(member);
 
   // Chore history breakdown
@@ -6462,8 +6463,11 @@ function _statBreakdownTable(rows, col1, col2) {
   </table>`;
 }
 
-function renderFamilyStatsCard(kids) {
-  const allHist = (D.history || []).filter(h => kids.some(k => k.id === h.memberId));
+function renderFamilyStatsCard(kids, histIdx) {
+  const kidIds = new Set(kids.map(k => k.id));
+  const allHist = histIdx
+    ? kids.flatMap(k => histIdx.get(k.id) || [])
+    : (D.history || []).filter(h => kidIds.has(h.memberId));
   const choreHist   = allHist.filter(h => h.type === 'chore');
   const declineHist = allHist.filter(h => h.type === 'decline');
 
@@ -6554,9 +6558,9 @@ function renderFamilyStatsCard(kids) {
     </div>`;
 }
 
-function renderMemberStatsCard(member, collapse) {
+function renderMemberStatsCard(member, collapse, histIdx) {
   // collapse = { isExpanded: bool, toggleFn: string } | null (null = always expanded, no toggle)
-  const s = buildMemberStats(member);
+  const s = buildMemberStats(member, histIdx);
   const color = member.color || '#6C63FF';
   const tts = isTiny(member) ? (t) => t : () => '';
 
@@ -6690,24 +6694,34 @@ function renderMemberStatsCard(member, collapse) {
     </div>`;
 }
 
+function buildHistoryIndex() {
+  const idx = new Map();
+  for (const h of (D.history || [])) {
+    if (!idx.has(h.memberId)) idx.set(h.memberId, []);
+    idx.get(h.memberId).push(h);
+  }
+  return idx;
+}
+
 function renderStatsPage(container) {
   if (!container) return;
   const viewer = S.currentUser;
   const isKid  = viewer?.role === 'kid';
   const kids   = D.family.members.filter(m => m.role === 'kid' && !m.deleted);
+  const histIdx = buildHistoryIndex();
 
   let html = `<div style="padding-bottom:20px"><div style="font-size:1.2rem;font-weight:800;padding:16px 0 12px"><i class="ph-duotone ph-chart-bar" style="color:#6C63FF;vertical-align:middle"></i> Lifetime Stats</div>`;
 
   if (isKid) {
-    html += renderMemberStatsCard(viewer);
+    html += renderMemberStatsCard(viewer, null, histIdx);
   } else {
     if (kids.length === 0) {
       html += `<div class="empty-state"><div class="empty-icon"><i class="ph-duotone ph-smiley" style="color:#9CA3AF;font-size:3rem"></i></div><div class="empty-text">No kids added yet</div></div>`;
     } else {
-      html += renderFamilyStatsCard(kids);
+      html += renderFamilyStatsCard(kids, histIdx);
       kids.forEach(kid => {
         const isExpanded = _expandedStatsKids.has(kid.id);
-        html += renderMemberStatsCard(kid, { isExpanded, toggleFn: `toggleStatsKid('${kid.id}')` });
+        html += renderMemberStatsCard(kid, { isExpanded, toggleFn: `toggleStatsKid('${kid.id}')` }, histIdx);
       });
     }
   }
@@ -7800,6 +7814,7 @@ function deleteCustomLevel(idx) {
 }
 
 function resetLevelsToDefault() {
+  if (!confirm('Reset all levels back to the defaults? Your custom levels will be lost.')) return;
   D.settings.customLevels = null;
   saveData();
   renderParentLevels();
@@ -7854,13 +7869,6 @@ function saveBaseBadge(id, field, value) {
   saveData();
 }
 
-function resetBaseBadge(id) {
-  if (D.settings.customBadgeDefs?.[id]) {
-    delete D.settings.customBadgeDefs[id];
-    saveData();
-    renderParentLevels();
-  }
-}
 
 function saveChoreBadgeTier(choreId, tierIdx, field, value) {
   const chore = D.chores.find(c => c.id === choreId);
@@ -8203,6 +8211,7 @@ function advClearChoreCompletions(choreId, memberId) {
 }
 
 function advDeleteHistory(entryId) {
+  if (!confirm('Delete this history entry?')) return;
   const idx = D.history.findIndex(h => h.id === entryId);
   if (idx < 0) return;
   D.history.splice(idx, 1);
