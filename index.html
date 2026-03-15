@@ -2734,6 +2734,7 @@ function historyIcon(h) {
     return '<i class="ph-duotone ph-sparkle" style="color:#7C3AED"></i>';
   }
   if (h.type === 'level')   return '<i class="ph-duotone ph-trophy" style="color:#D97706"></i>';
+  if (h.type === 'badge')   return '<i class="ph-duotone ph-medal" style="color:#7C3AED"></i>';
   if (h.type === 'goal')    return '<i class="ph-duotone ph-target" style="color:#0E7490"></i>';
   if (h.type === 'savings') return '<i class="ph-duotone ph-piggy-bank" style="color:#16A34A"></i>';
   if (h.type === 'decline') return '<i class="ph-duotone ph-x-circle" style="color:#9CA3AF"></i>';
@@ -2752,6 +2753,7 @@ function historyBadge(h) {
   }
   if (h.type === 'bonus')   return (h.title||'').includes('Combo') ? { color:'#b45309', bg:'#FEF3C7' } : { color:'#4c1d95', bg:'#EDE9FE' };
   if (h.type === 'level')   return { color:'#4c1d95', bg:'#EDE9FE' };
+  if (h.type === 'badge')   return { color:'#6b21a8', bg:'#F5F3FF' };
   if (h.type === 'goal')    return { color:'#0e7490', bg:'#ECFEFF' };
   if (h.type === 'savings') return { color:'#166534', bg:'#DCFCE7' };
   if (h.type === 'decline') return { color:'#6b7280', bg:'#F3F4F6' };
@@ -2833,6 +2835,7 @@ function awardBadgeIfNew(member, badgeId) {
   const def = getBaseBadgeDef(badgeId);
   if (!def || def.disabled) return false;
   member.badges.push(badgeId);
+  addHistory('badge', member.id, `${def.icon} ${def.name}`, 0);
   toast(`${def.icon} Badge unlocked: ${def.name}!`);
   return true;
 }
@@ -2857,7 +2860,8 @@ function checkChoreBadges(chore, memberId) {
     const key = `cb_${badge.id}`;
     if (doneCount >= badge.count && !member.badges.includes(key)) {
       member.badges.push(key);
-      toast(`${badge.icon} New badge: ${badge.name}! (${chore.title} × ${badge.count})`);
+      addHistory('badge', member.id, `${badge.icon||'🏅'} ${badge.name}`, 0, { choreTitle: chore.title });
+      toast(`${badge.icon||'🏅'} New badge: ${badge.name}! (${chore.title} × ${badge.count})`);
     }
   }
 }
@@ -6762,7 +6766,7 @@ function renderParentHome() {
         <span style="background:${badge.bg};color:${badge.color};border-radius:8px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:0.85rem;flex-shrink:0">${icon}</span>
         <div style="flex:1;min-width:0">
           <div style="font-weight:600;font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc((h.title||'').replace(/^⚡\s*/,''))}</div>
-          <div style="font-size:0.77rem;color:var(--muted)">${mem ? `${mem.avatar} ${esc(mem.name)}` : '<span style="font-style:italic">Former member</span>'} · ${fmtDate(h.date)}</div>
+          <div style="font-size:0.77rem;color:var(--muted)">${mem ? `${mem.avatar} ${esc(mem.name)}` : '<span style="font-style:italic">Former member</span>'}${h.choreTitle ? ` · ${esc(h.choreTitle)}` : ''} · ${fmtDate(h.date)}</div>
         </div>
         ${ptsStr ? `<span style="font-weight:700;color:${ptsColor};font-size:0.9rem;white-space:nowrap">${ptsStr}</span>` : ''}
       </div>`;
