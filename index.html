@@ -1666,6 +1666,7 @@ const ICONS = {
   settings: `<svg viewBox="0 0 28 28" fill="none" width="1em" height="1em"><line x1="4" y1="8" x2="24" y2="8" stroke="#FF9A3C" stroke-width="1.8" stroke-linecap="round" opacity=".35"/><line x1="4" y1="14" x2="24" y2="14" stroke="#FF9A3C" stroke-width="1.8" stroke-linecap="round" opacity=".35"/><line x1="4" y1="20" x2="24" y2="20" stroke="#FF9A3C" stroke-width="1.8" stroke-linecap="round" opacity=".35"/><circle cx="10" cy="8" r="3.2" fill="#FF9A3C"/><circle cx="18" cy="14" r="3.2" fill="#FF9A3C"/><circle cx="10" cy="20" r="3.2" fill="#FF9A3C"/></svg>`,
   family:   `<svg viewBox="0 0 28 28" fill="none" width="1em" height="1em"><circle cx="9.5" cy="8.5" r="3.5" fill="#FF6584" fill-opacity=".3" stroke="#FF6584" stroke-width="1.7"/><circle cx="18.5" cy="8.5" r="3.5" fill="#FF6584" fill-opacity=".3" stroke="#FF6584" stroke-width="1.7"/><path d="M2 24c0-4.2 3.4-7.5 7.5-7.5" stroke="#FF6584" stroke-width="1.7" stroke-linecap="round" fill="none" opacity=".5"/><path d="M11 24c0-4.2 3.4-7.5 7.5-7.5S26 19.8 26 24" stroke="#FF6584" stroke-width="1.7" stroke-linecap="round" fill="none"/></svg>`,
   today:    `<svg viewBox="0 0 28 28" fill="none" width="1em" height="1em"><rect x="4" y="7" width="20" height="18" rx="3" fill="#43D9AD" fill-opacity=".18" stroke="#43D9AD" stroke-width="1.8"/><line x1="4" y1="13" x2="24" y2="13" stroke="#43D9AD" stroke-width="1.8"/><line x1="9" y1="4" x2="9" y2="10" stroke="#43D9AD" stroke-width="1.8" stroke-linecap="round"/><line x1="19" y1="4" x2="19" y2="10" stroke="#43D9AD" stroke-width="1.8" stroke-linecap="round"/><circle cx="14" cy="19.5" r="4" fill="#43D9AD" opacity=".8"/></svg>`,
+  levels:   `<svg viewBox="0 0 28 28" fill="none" width="1em" height="1em"><rect x="3" y="19" width="5" height="6" rx="1.2" fill="#6C63FF" fill-opacity=".25" stroke="#6C63FF" stroke-width="1.6"/><rect x="10" y="14" width="5" height="11" rx="1.2" fill="#6C63FF" fill-opacity=".5" stroke="#6C63FF" stroke-width="1.6"/><rect x="17" y="9" width="5" height="16" rx="1.2" fill="#6C63FF" stroke="#6C63FF" stroke-width="1.6"/><path d="M19.5 3l.9 1.9 2.1.4-1.5 1.4.4 2-1.9-1-1.9 1 .4-2L16.5 5.3l2.1-.4L19.5 3z" fill="#FFD93D" stroke="#D97706" stroke-width=".6" stroke-linejoin="round"/></svg>`,
 };
 
 // Phosphor duotone icon map for chore and prize pickers
@@ -2798,14 +2799,21 @@ const BADGE_DEFS = [
   { id:'level_master', icon:'<i class="ph-duotone ph-crown-simple" style="color:#D97706"></i>',   name:'Master Level',      desc:'Reach level 7 (Master)' },
 ];
 
+function getLevels() {
+  const custom = D?.settings?.customLevels;
+  if (Array.isArray(custom) && custom.length >= 2) return custom;
+  return DEFAULT_LEVELS;
+}
+
 function getMemberLevel(member) {
+  const levels = getLevels();
   const xp = member.xp || member.totalEarned || 0;
-  let current = DEFAULT_LEVELS[0];
-  for (const lvl of DEFAULT_LEVELS) {
+  let current = levels[0];
+  for (const lvl of levels) {
     if (xp >= lvl.minXp) current = lvl;
   }
-  const nextIdx = DEFAULT_LEVELS.findIndex(l => l.level === current.level + 1);
-  const next = nextIdx >= 0 ? DEFAULT_LEVELS[nextIdx] : null;
+  const nextIdx = levels.findIndex(l => l.level === current.level + 1);
+  const next = nextIdx >= 0 ? levels[nextIdx] : null;
   const xpIntoLevel = next ? xp - current.minXp : 0;
   const xpNeeded    = next ? next.minXp - current.minXp : 1;
   const pct         = next ? Math.min(100, Math.round(xpIntoLevel / xpNeeded * 100)) : 100;
@@ -2851,7 +2859,8 @@ function checkLevelUp(member, prevLevel) {
   const { current } = getMemberLevel(member);
   if (current.level > prevLevel) {
     awardBadgeIfNew(member, 'level_up');
-    if (current.level === 7) awardBadgeIfNew(member, 'level_master');
+    const maxLevel = getLevels().at(-1)?.level;
+    if (current.level === maxLevel) awardBadgeIfNew(member, 'level_master');
     addHistory('level', member.id, `${current.icon} Level Up — ${current.name}!`, 0);
     toast(`${current.icon} Level up! ${member.name} is now ${current.name}!`);
   }
@@ -6124,6 +6133,7 @@ function renderParentNav() {
     ['home',    ICONS.home,     'Overview'],
     ['chores',  ICONS.chores,   'Chores'],
     ['prizes',  ICONS.prizes,   'Prizes'],
+    ['levels',  ICONS.levels,   'Levels'],
     ['stats',   ICONS.stats,    'Stats'],
   ];
   document.getElementById('parent-nav').innerHTML = tabs.map(([id,icon,label]) => `
@@ -6145,6 +6155,7 @@ function renderParentTab() {
     case 'home':     renderParentHome();     break;
     case 'chores':   renderParentChores();   break;
     case 'prizes':   renderParentPrizes();   break;
+    case 'levels':   renderParentLevels();   break;
     case 'stats':    renderStatsPage(document.getElementById('parent-content')); break;
   }
   } catch(e) {
@@ -7450,6 +7461,206 @@ function renderParentPrizes() {
   });
 
   document.getElementById('parent-content').innerHTML = html;
+}
+
+// ── LEVELS TAB ────────────────────────────────────────────────
+const LEVEL_ICON_OPTIONS = [
+  { label:'Leaf',       html:'<i class="ph-duotone ph-leaf" style="color:#22C55E;font-size:1.4rem"></i>' },
+  { label:'Diamond',    html:'<i class="ph-duotone ph-diamond" style="color:#3B82F6;font-size:1.4rem"></i>' },
+  { label:'Gem',        html:'<i class="ph-duotone ph-diamond" style="color:#7C3AED;font-size:1.4rem"></i>' },
+  { label:'Trophy',     html:'<i class="ph-duotone ph-trophy" style="color:#D97706;font-size:1.4rem"></i>' },
+  { label:'Fire',       html:'<i class="ph-duotone ph-fire" style="color:#EF4444;font-size:1.4rem"></i>' },
+  { label:'Shield',     html:'<i class="ph-duotone ph-shield-star" style="color:#6C63FF;font-size:1.4rem"></i>' },
+  { label:'Crown',      html:'<i class="ph-duotone ph-crown" style="color:#D97706;font-size:1.4rem"></i>' },
+  { label:'Star',       html:'<i class="ph-duotone ph-star" style="color:#F59E0B;font-size:1.4rem"></i>' },
+  { label:'Rocket',     html:'<i class="ph-duotone ph-rocket-launch" style="color:#6C63FF;font-size:1.4rem"></i>' },
+  { label:'Lightning',  html:'<i class="ph-duotone ph-lightning" style="color:#F59E0B;font-size:1.4rem"></i>' },
+  { label:'Medal',      html:'<i class="ph-duotone ph-medal" style="color:#D97706;font-size:1.4rem"></i>' },
+  { label:'Sparkle',    html:'<i class="ph-duotone ph-sparkle" style="color:#EC4899;font-size:1.4rem"></i>' },
+  { label:'Mountain',   html:'<i class="ph-duotone ph-mountains" style="color:#6B7280;font-size:1.4rem"></i>' },
+  { label:'Sword',      html:'<i class="ph-duotone ph-sword" style="color:#EF4444;font-size:1.4rem"></i>' },
+  { label:'Acorn',      html:'<i class="ph-duotone ph-acorn" style="color:#92400E;font-size:1.4rem"></i>' },
+  { label:'Planet',     html:'<i class="ph-duotone ph-planet" style="color:#3B82F6;font-size:1.4rem"></i>' },
+  { label:'⭐',         html:'<span style="font-size:1.4rem">⭐</span>' },
+  { label:'🏆',         html:'<span style="font-size:1.4rem">🏆</span>' },
+  { label:'🔥',         html:'<span style="font-size:1.4rem">🔥</span>' },
+  { label:'💎',         html:'<span style="font-size:1.4rem">💎</span>' },
+  { label:'👑',         html:'<span style="font-size:1.4rem">👑</span>' },
+  { label:'🌟',         html:'<span style="font-size:1.4rem">🌟</span>' },
+  { label:'⚡',         html:'<span style="font-size:1.4rem">⚡</span>' },
+  { label:'🎖️',        html:'<span style="font-size:1.4rem">🎖️</span>' },
+];
+
+function renderParentLevels() {
+  const s = D.settings;
+  const levels = getLevels();
+  const members = (D.members || []).filter(m => !m.deleted);
+
+  // ── Leveling system card ──
+  let levelsHtml = levels.map((lvl, i) => `
+    <div class="admin-card" style="margin-bottom:8px;gap:8px;align-items:flex-start">
+      <button onclick="showLevelIconPicker(${i})" title="Change icon"
+        style="font-size:1.4rem;background:none;border:1px dashed #D1D5DB;border-radius:8px;padding:4px 8px;cursor:pointer;min-width:44px;text-align:center;flex-shrink:0;line-height:1.4">${lvl.icon}</button>
+      <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+        <input type="text" value="${esc(lvl.name)}" placeholder="Level name"
+          style="font-size:0.9rem;padding:6px 10px;border:1px solid #E5E7EB;border-radius:8px;width:100%"
+          onchange="saveCustomLevel(${i},'name',this.value)">
+        <div style="display:flex;align-items:center;gap:6px">
+          <input type="number" value="${lvl.minXp}" min="0" ${i===0?'disabled title="Level 1 always starts at 0 XP"':''}
+            style="width:80px;font-size:0.9rem;padding:6px 10px;border:1px solid #E5E7EB;border-radius:8px"
+            onchange="saveCustomLevel(${i},'minXp',parseInt(this.value)||0)">
+          <span style="font-size:0.8rem;color:var(--muted)">XP to unlock</span>
+        </div>
+      </div>
+      ${levels.length > 2 ? `<button onclick="deleteCustomLevel(${i})"
+        style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:1.1rem;padding:4px;flex-shrink:0">
+        <i class="ph-duotone ph-trash"></i></button>` : ''}
+    </div>`).join('');
+
+  // ── Per-member badge grids ──
+  let badgesHtml = '';
+  if (members.length === 0) {
+    badgesHtml = `<div class="empty-state"><div class="empty-text">No kids added yet</div></div>`;
+  } else {
+    badgesHtml = members.map(m => {
+      const earned = Array.isArray(m.badges) ? m.badges : [];
+      const sysBadges = BADGE_DEFS.map(def => {
+        const has = earned.includes(def.id);
+        return `<div title="${def.name}: ${def.desc}" style="display:flex;flex-direction:column;align-items:center;gap:3px;opacity:${has?'1':'0.28'};transition:opacity .2s">
+          <span style="font-size:1.6rem">${def.icon}</span>
+          <span style="font-size:0.65rem;color:var(--muted);text-align:center;max-width:52px;line-height:1.2">${def.name}</span>
+        </div>`;
+      }).join('');
+
+      // Chore badges — scan chore.badges for cb_ prefixed keys
+      const choreBadgeItems = [];
+      (D.chores || []).forEach(chore => {
+        if (!chore.badges?.length) return;
+        chore.badges.forEach(b => {
+          if (!b?.id) return;
+          const key = `cb_${b.id}`;
+          const has = earned.includes(key);
+          choreBadgeItems.push(`<div title="${esc(b.name)}: ${esc(chore.title)} × ${b.count}"
+            style="display:flex;flex-direction:column;align-items:center;gap:3px;opacity:${has?'1':'0.28'};transition:opacity .2s">
+            <span style="font-size:1.6rem">${b.icon||'🏅'}</span>
+            <span style="font-size:0.65rem;color:var(--muted);text-align:center;max-width:52px;line-height:1.2">${esc(b.name)}</span>
+          </div>`);
+        });
+      });
+
+      const choreBadgeSection = choreBadgeItems.length > 0 ? `
+        <div style="font-size:0.78rem;color:var(--muted);font-weight:600;margin:10px 0 6px">Chore Badges</div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px">${choreBadgeItems.join('')}</div>` : '';
+
+      const lvlInfo = getMemberLevel(m);
+      return `<div style="margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="font-size:1.4rem">${m.avatar||'🌟'}</span>
+          <span style="font-weight:700;color:var(--text)">${esc(m.name)}</span>
+          <span style="font-size:0.8rem;color:var(--muted);margin-left:auto">${lvlInfo.current.icon} ${esc(lvlInfo.current.name)} · ${lvlInfo.xp} XP</span>
+        </div>
+        <div style="font-size:0.78rem;color:var(--muted);font-weight:600;margin-bottom:6px">Achievement Badges</div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px">${sysBadges}</div>
+        ${choreBadgeSection}
+      </div>`;
+    }).join('<div class="divider"></div>');
+  }
+
+  const html = `
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <div class="card-title" style="margin:0"><i class="ph-duotone ph-rocket-launch" style="color:#6C63FF;font-size:1rem;vertical-align:middle"></i> Leveling System</div>
+        <label class="toggle"><input type="checkbox" ${s.levelingEnabled!==false?'checked':''} onchange="saveSetting('levelingEnabled',this.checked);renderParentLevels()"><span class="toggle-track"></span></label>
+      </div>
+      <p style="font-size:0.83rem;color:var(--muted);margin-bottom:14px">Kids earn XP equal to their diamonds earned and unlock levels as they progress.</p>
+      ${levelsHtml}
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button class="btn btn-primary btn-sm" onclick="addCustomLevel()">+ Add Level</button>
+        <button class="btn btn-sm" style="background:#F3F4F6;color:#374151" onclick="resetLevelsToDefault()">Reset to Defaults</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <div class="card-title" style="margin:0"><i class="ph-duotone ph-fire" style="color:#F97316;font-size:1rem;vertical-align:middle"></i> Streak Bonuses</div>
+        <label class="toggle"><input type="checkbox" ${s.streakEnabled!==false?'checked':''} onchange="saveSetting('streakEnabled',this.checked);renderParentLevels()"><span class="toggle-track"></span></label>
+      </div>
+      <p style="font-size:0.83rem;color:var(--muted);margin-bottom:14px">Bonus diamonds when a kid completes all their chores ${s.streakEnabled!==false?'<b>every day in a row</b>':'(currently disabled)'}.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="form-group mb-0"><label class="form-label">3-day streak</label><input type="number" value="${s.streakBonus3||1}" min="0" onchange="saveSetting('streakBonus3',parseInt(this.value)||0)"> <span style="font-size:0.75rem;color:var(--muted)">💎 bonus</span></div>
+        <div class="form-group mb-0"><label class="form-label">7-day streak</label><input type="number" value="${s.streakBonus7||3}" min="0" onchange="saveSetting('streakBonus7',parseInt(this.value)||0)"> <span style="font-size:0.75rem;color:var(--muted)">💎 bonus</span></div>
+        <div class="form-group mb-0"><label class="form-label">14-day streak</label><input type="number" value="${s.streakBonus14||5}" min="0" onchange="saveSetting('streakBonus14',parseInt(this.value)||0)"> <span style="font-size:0.75rem;color:var(--muted)">💎 bonus</span></div>
+        <div class="form-group mb-0"><label class="form-label">30-day streak</label><input type="number" value="${s.streakBonus30||10}" min="0" onchange="saveSetting('streakBonus30',parseInt(this.value)||0)"> <span style="font-size:0.75rem;color:var(--muted)">💎 bonus</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="ph-duotone ph-medal" style="color:#D97706;font-size:1rem;vertical-align:middle"></i> Kid Badges</div>
+      ${badgesHtml}
+    </div>`;
+
+  document.getElementById('parent-content').innerHTML = html;
+}
+
+function saveCustomLevel(idx, field, value) {
+  const levels = getLevels().map((l,i) => ({...l}));
+  levels[idx][field] = value;
+  // Enforce ascending XP
+  if (field === 'minXp') {
+    for (let i = 1; i < levels.length; i++) {
+      if (levels[i].minXp <= levels[i-1].minXp) levels[i].minXp = levels[i-1].minXp + 1;
+    }
+  }
+  D.settings.customLevels = levels;
+  saveData();
+  renderParentLevels();
+}
+
+function addCustomLevel() {
+  const levels = getLevels().map(l => ({...l}));
+  const last = levels[levels.length - 1];
+  levels.push({ level: last.level + 1, name: 'New Level', icon: '<i class="ph-duotone ph-star" style="color:#F59E0B;font-size:1.4rem"></i>', minXp: last.minXp + 200 });
+  D.settings.customLevels = levels;
+  saveData();
+  renderParentLevels();
+}
+
+function deleteCustomLevel(idx) {
+  const levels = getLevels().map(l => ({...l}));
+  if (levels.length <= 2) { toast('Need at least 2 levels'); return; }
+  levels.splice(idx, 1);
+  // Reassign level numbers
+  levels.forEach((l, i) => { l.level = i + 1; });
+  D.settings.customLevels = levels;
+  saveData();
+  renderParentLevels();
+}
+
+function resetLevelsToDefault() {
+  D.settings.customLevels = null;
+  saveData();
+  renderParentLevels();
+}
+
+function showLevelIconPicker(levelIdx) {
+  const optionsHtml = LEVEL_ICON_OPTIONS.map((opt, i) =>
+    `<button onclick="pickLevelIcon(${levelIdx},${i})" title="${opt.label}"
+      style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;width:44px;height:44px">
+      ${opt.html}
+    </button>`
+  ).join('');
+  showModal(`
+    <div class="modal-title">Choose Icon</div>
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:8px">${optionsHtml}</div>
+  `);
+}
+
+function pickLevelIcon(levelIdx, optionIdx) {
+  const opt = LEVEL_ICON_OPTIONS[optionIdx];
+  if (!opt) return;
+  const icon = opt.html.replace('font-size:1.4rem', 'font-size:1em');
+  saveCustomLevel(levelIdx, 'icon', icon);
+  closeModal();
 }
 
 function showPrizeModal(prizeId) {
