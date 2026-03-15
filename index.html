@@ -61,7 +61,7 @@
       padding: 0;
       gap: 0;
     }
-    .home-logo { font-size: 3.5rem; margin-bottom: 8px; }
+    .home-logo { width: 80px; height: 80px; margin-bottom: 8px; }
     .home-title {
       color: #fff;
       font-size: 2.2rem;
@@ -725,7 +725,7 @@
       padding: 10vh 24px 6vh;
       gap: 0;
     }
-    .pin-avatar { font-size: 5.5rem; margin-bottom: 8px; }
+    .pin-avatar { width: 90px; height: 90px; margin-bottom: 8px; }
     .pin-title  { font-size: 2rem; font-weight: 800; margin-bottom: 6px; }
     .pin-sub    { color: var(--muted); font-size: 1rem; margin-bottom: 40px; }
     .pin-dots {
@@ -1605,7 +1605,7 @@ function showAppPin() {
   S.pinBuffer = '';
   S.pinMode   = 'app';
   document.getElementById('pin-content').innerHTML = `
-    <div class="pin-avatar">💎</div>
+    <img class="pin-avatar" src="gemsproutpadded.png">
     <div class="pin-title">GemSprout</div>
     <div class="pin-sub">Enter parent PIN to continue</div>
     <div class="pin-dots" id="pin-dots">
@@ -4457,7 +4457,7 @@ function renderHome() {
 
   document.getElementById('home-content').innerHTML = `
     <div class="screen active" id="screen-home" style="background:linear-gradient(145deg,#667eea,#764ba2);align-items:center;justify-content:center;padding:24px;min-height:100vh;display:flex;flex-direction:column">
-      <div class="home-logo">💎</div>
+      <img class="home-logo" src="gemsproutpadded.png">
       <div class="home-title">GemSprout</div>
       <div class="home-family-name">${esc(D.family.name)}</div>
       <div class="profile-grid">${cards}</div>
@@ -4469,7 +4469,7 @@ function renderHome() {
   root.innerHTML = `
     ${bdayBanner}
     <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;padding:24px">
-      <div class="home-logo" style="color:#fff;font-size:3.5rem;margin-top:20px">💎</div>
+      <img class="home-logo" src="gemsproutpadded.png" style="margin-top:20px">
       <div class="home-title">GemSprout</div>
       <div class="home-family-name">${esc(D.family.name)}</div>
       <div class="profile-grid" style="max-width:980px;width:100%;padding:0">${cards}</div>
@@ -8515,7 +8515,7 @@ function showLoading() {
   const el = document.getElementById('screen-auth');
   el.style.cssText = 'background:linear-gradient(145deg,#667eea,#764ba2);align-items:center;justify-content:center;display:flex;flex-direction:column;gap:16px;text-align:center';
   el.innerHTML = `
-    <div style="font-size:3.5rem">💎</div>
+    <img src="gemsproutpadded.png" style="width:90px;height:90px">
     <div style="color:#fff;font-size:1.8rem;font-weight:800">GemSprout</div>
     <div style="color:rgba(255,255,255,0.8);font-size:1rem"><i class="ph-duotone ph-hourglass" style="font-size:1rem;vertical-align:middle"></i> Loading...</div>`;
 }
