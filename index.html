@@ -4106,27 +4106,6 @@ function renderSettings() {
       </div>
 
       <div class="card">
-        <div class="card-title"><i class="ph-duotone ph-trend-up" style="color:#0F766E;font-size:1rem;vertical-align:middle"></i> Levels &amp; Streaks</div>
-        <div class="toggle-row">
-          <div><div class="toggle-label">Enable leveling system</div>
-            <div class="toggle-sub">Kids earn XP and unlock level titles as they complete chores</div></div>
-          <label class="toggle"><input type="checkbox" ${s.levelingEnabled!==false?'checked':''} onchange="saveSetting('levelingEnabled',this.checked)"><span class="toggle-track"></span></label>
-        </div>
-        <div class="toggle-row">
-          <div><div class="toggle-label">Enable streak bonuses</div>
-            <div class="toggle-sub">Bonus diamonds for consecutive days of completing all chores</div></div>
-          <label class="toggle"><input type="checkbox" ${s.streakEnabled!==false?'checked':''} onchange="saveSetting('streakEnabled',this.checked)"><span class="toggle-track"></span></label>
-        </div>
-        <div style="margin-top:12px;font-size:0.82rem;color:var(--muted);font-weight:600;margin-bottom:8px">Streak bonus diamonds</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div class="form-group mb-0"><label class="form-label">3-day</label><input type="number" value="${s.streakBonus3||1}" min="0" onchange="saveSetting('streakBonus3',parseInt(this.value)||0)"></div>
-          <div class="form-group mb-0"><label class="form-label">7-day</label><input type="number" value="${s.streakBonus7||3}" min="0" onchange="saveSetting('streakBonus7',parseInt(this.value)||0)"></div>
-          <div class="form-group mb-0"><label class="form-label">14-day</label><input type="number" value="${s.streakBonus14||5}" min="0" onchange="saveSetting('streakBonus14',parseInt(this.value)||0)"></div>
-          <div class="form-group mb-0"><label class="form-label">30-day</label><input type="number" value="${s.streakBonus30||10}" min="0" onchange="saveSetting('streakBonus30',parseInt(this.value)||0)"></div>
-        </div>
-      </div>
-
-      <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
           <div class="card-title" style="margin:0"><i class="ph-duotone ph-speaker-slash" style="color:#EF4444;font-size:1rem;vertical-align:middle"></i> Not Listening</div>
           <label class="toggle"><input type="checkbox" ${s.notListeningEnabled!==false?'checked':''} onchange="saveSetting('notListeningEnabled',this.checked);renderParentHome()"><span class="toggle-track"></span></label>
@@ -7494,7 +7473,7 @@ const LEVEL_ICON_OPTIONS = [
 function renderParentLevels() {
   const s = D.settings;
   const levels = getLevels();
-  const members = (D.members || []).filter(m => !m.deleted);
+  const members = (D.family?.members || []).filter(m => m.role !== 'parent' && !m.deleted);
 
   // ── Leveling system card ──
   let levelsHtml = levels.map((lvl, i) => `
