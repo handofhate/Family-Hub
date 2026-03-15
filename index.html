@@ -7669,9 +7669,9 @@ function renderParentLevels() {
                 <span style="font-size:0.8rem;color:var(--muted);white-space:nowrap">completions</span>
               </div>
               <button onclick="saveChoreBadgeTier('${chore.id}',${i},'secret',${!b.secret});renderParentLevels()"
-                style="margin-left:auto;background:${b.secret?'#ede9fe':'none'};border:1px solid ${b.secret?'#c4b5fd':'#e5e7eb'};border-radius:8px;padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:5px;color:${b.secret?'#7c3aed':'#9ca3af'}">
-                <i class="ph-duotone ph-${b.secret?'eye-slash':'eye'}" style="font-size:1rem"></i>
-                <span style="font-size:0.78rem;font-weight:600">${b.secret?'Secret badge':'Show as locked'}</span>
+                style="margin-left:auto;background:${b.secret?'#ede9fe':'none'};border:1px solid ${b.secret?'#c4b5fd':'#e5e7eb'};border-radius:8px;padding:7px 10px;cursor:pointer;display:flex;align-items:center;gap:5px;color:${b.secret?'#7c3aed':'#9ca3af'}">
+                <i class="ph-duotone ph-${b.secret?'eye-slash':'eye'}" style="font-size:1.1rem"></i>
+                ${b.secret?`<span style="font-size:0.78rem;font-weight:600">Secret</span>`:''}
               </button>
             </div>
           </div>`).join('');
@@ -7724,7 +7724,7 @@ function renderParentLevels() {
 
     <div class="card">
       <div class="card-title" style="margin-bottom:12px"><i class="ph-duotone ph-medal" style="color:#D97706;font-size:1rem;vertical-align:middle"></i> Chore Badges</div>
-      <p style="font-size:0.83rem;color:var(--muted);margin-bottom:14px">Per-chore milestone badges — kids earn these by completing a chore a set number of times.</p>
+      <p style="font-size:0.83rem;color:var(--muted);margin-bottom:14px">Per-chore milestone badges — kids earn these by completing a chore a set number of times. Use <i class="ph-duotone ph-eye-slash" style="color:#7c3aed;vertical-align:middle"></i> to make a badge secret — it won't appear at all until earned, making it a surprise to discover.</p>
       ${choreBadgeCards}
     </div>`;
 
