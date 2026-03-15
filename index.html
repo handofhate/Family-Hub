@@ -7665,8 +7665,8 @@ function renderParentLevels() {
               <i class="ph-duotone ph-eye-slash" style="font-size:0.9rem;vertical-align:middle"></i>
             </label>
             <button onclick="removeChoreBadgeTier('${chore.id}',${i})"
-              style="background:#FEE2E2;color:#991b1b;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:0.8rem;flex-shrink:0">
-              <i class="ph-duotone ph-x" style="font-size:0.9rem"></i></button>
+              title="Delete badge tier" style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:1.1rem;padding:4px;flex-shrink:0">
+              <i class="ph-duotone ph-trash"></i></button>
           </div>`).join('');
 
         return `<div style="margin-bottom:4px;padding-bottom:12px;border-bottom:1px solid #F3F4F6">
@@ -7750,6 +7750,7 @@ function addCustomLevel() {
 function deleteCustomLevel(idx) {
   const levels = getLevels().map(l => ({...l}));
   if (levels.length <= 2) { toast('Need at least 2 levels'); return; }
+  if (!confirm(`Delete level "${levels[idx]?.name || 'this level'}"?`)) return;
   levels.splice(idx, 1);
   // Reassign level numbers
   levels.forEach((l, i) => { l.level = i + 1; });
@@ -7843,6 +7844,8 @@ function addChoreBadgeTier(choreId) {
 function removeChoreBadgeTier(choreId, tierIdx) {
   const chore = D.chores.find(c => c.id === choreId);
   if (!chore || !chore.badges) return;
+  const badge = chore.badges[tierIdx];
+  if (!confirm(`Delete "${badge?.name || 'this badge tier'}" from ${chore.title}?`)) return;
   chore.badges.splice(tierIdx, 1);
   saveData();
   renderParentLevels();
