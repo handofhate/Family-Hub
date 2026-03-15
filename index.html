@@ -7659,11 +7659,11 @@ function renderParentLevels() {
             <input type="text" value="${esc(b.name||'')}" placeholder="Badge name"
               style="flex:1;border:1px solid #d1d5db;border-radius:6px;padding:4px 6px;font-size:0.85rem"
               onchange="saveChoreBadgeTier('${chore.id}',${i},'name',this.value)">
-            <label title="${b.secret?'Secret ON: hidden from kids until earned':'Secret OFF: shows as faded/locked until earned — toggle to hide it completely'}"
-              style="display:flex;align-items:center;gap:3px;font-size:0.72rem;font-weight:600;color:${b.secret?'#7c3aed':'#9ca3af'};cursor:pointer;flex-shrink:0;user-select:none">
-              <input type="checkbox" ${b.secret?'checked':''} onchange="saveChoreBadgeTier('${chore.id}',${i},'secret',this.checked);renderParentLevels()" style="cursor:pointer">
-              <i class="ph-duotone ph-eye-slash" style="font-size:0.9rem;vertical-align:middle"></i>
-            </label>
+            <button onclick="saveChoreBadgeTier('${chore.id}',${i},'secret',${!b.secret});renderParentLevels()"
+              title="${b.secret?'Secret badge — hidden from kids until earned. Click to make it visible (shown locked until earned)':'Visible badge — shown as locked until earned. Click to make it secret (completely hidden until earned)'}"
+              style="background:${b.secret?'#ede9fe':'none'};border:1px solid ${b.secret?'#c4b5fd':'transparent'};border-radius:6px;padding:5px 7px;cursor:pointer;flex-shrink:0;line-height:1;color:${b.secret?'#7c3aed':'#9ca3af'}">
+              <i class="ph-duotone ph-${b.secret?'eye-slash':'eye'}" style="font-size:1rem;vertical-align:middle"></i>
+            </button>
             <button onclick="removeChoreBadgeTier('${chore.id}',${i})"
               title="Delete badge tier" style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:1.1rem;padding:4px;flex-shrink:0">
               <i class="ph-duotone ph-trash"></i></button>
