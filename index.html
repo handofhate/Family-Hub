@@ -1696,10 +1696,70 @@ const _FEATURED = [
   // General
   'heart','check-circle','clock','calendar','flag','bell','rocket','users',
 ];
+// Extra search synonyms: maps search terms → icon names they should also match
+const _ICON_SYNONYMS = {
+  'water':      ['drop','waves','swimming-pool','fish','anchor','wave-sine','wave-square','bathtub','shower','toilet','washing-machine'],
+  'swim':       ['swimming-pool','person-simple-swim','waves','drop'],
+  'run':        ['person-simple-run','sneaker','sneaker-move','footprints'],
+  'walk':       ['person-simple-walk','footprints','boot'],
+  'bike':       ['bicycle','person-simple-bike','motorcycle','moped'],
+  'sleep':      ['bed','moon','moon-stars','zzz','hourglass'],
+  'eat':        ['fork-knife','hamburger','pizza','bowl-food','cooking-pot','chef-hat','bread','carrot','apple'],
+  'food':       ['fork-knife','hamburger','pizza','bowl-food','cooking-pot','chef-hat','bread','carrot','apple','cherry','cheese','cake','ice-cream'],
+  'drink':      ['cup','beer-stein','wine','coffee','tea-bag','drop','pint-glass','martini'],
+  'clean':      ['broom','shower','washing-machine','spray-bottle','trash','soap','towel','toilet','bucket'],
+  'school':     ['graduation-cap','book','books','pencil','backpack','chalkboard','notebook','ruler'],
+  'study':      ['graduation-cap','book','books','pencil','notebook','brain','lightbulb'],
+  'sport':      ['trophy','medal','basketball','soccer-ball','football','tennis-ball','baseball','ping-pong','golf','volleyball','bowling-ball','swimming-pool','bicycle'],
+  'win':        ['trophy','medal','star','crown','confetti','seal-check','ribbon'],
+  'award':      ['trophy','medal','star','crown','seal-check','certificate','ribbon','gift'],
+  'money':      ['currency-dollar','piggy-bank','coins','coin','wallet','cash-register','bank','hand-coins','tip-jar'],
+  'happy':      ['smiley','confetti','heart','sparkle','star','sun','rainbow'],
+  'sad':        ['smiley-sad','smiley-meh','smiley-nervous','drop','cloud-rain'],
+  'angry':      ['smiley-angry','fire','lightning','warning'],
+  'love':       ['heart','heart-straight','hand-heart','rose','flower'],
+  'flower':     ['flower','flower-lotus','flower-tulip','leaf','plant','potted-plant','tree','park'],
+  'animal':     ['cat','dog','bird','fish','cow','rabbit','paw-print','horse','butterfly','bee'],
+  'pet':        ['cat','dog','paw-print','fish','bird'],
+  'music':      ['music-note','music-notes','headphones','guitar','piano-keys','vinyl-record','speaker-high'],
+  'art':        ['palette','paint-brush','pencil','paint-roller','pen-nib'],
+  'game':       ['game-controller','joystick','chess','puzzle-piece','dice-five','poker-chip'],
+  'phone':      ['device-mobile','phone','chat','chat-circle'],
+  'computer':   ['laptop','desktop','monitor','device-tablet','code'],
+  'home':       ['house','house-line','couch','armchair','bed','lamp','key'],
+  'work':       ['briefcase','desk','office-chair','toolbox','wrench','hammer'],
+  'health':     ['heart','heartbeat','first-aid','first-aid-kit','pill','stethoscope','hospital','shield-check'],
+  'nature':     ['leaf','tree','flower','sun','cloud','rainbow','mountain','park','plant'],
+  'weather':    ['sun','cloud','cloud-rain','cloud-snow','cloud-lightning','snowflake','wind','rainbow','umbrella'],
+  'time':       ['clock','hourglass','calendar','timer','alarm'],
+  'travel':     ['airplane','car','bus','train','boat','map-pin','globe','suitcase'],
+  'clothes':    ['shirt','pants','dress','shoe','sneaker','hoodie','coat-hanger','sock'],
+  'read':       ['book','book-open','newspaper','magazine','bookmark'],
+  'write':      ['pencil','pen','pen-nib','notepad','notebook','note'],
+  'cook':       ['cooking-pot','chef-hat','fork-knife','oven','fire','bowl-food'],
+  'play':       ['game-controller','playground','balloon','confetti','puzzle-piece','music-note'],
+  'outside':    ['sun','tree','park','footprints','bicycle','mountains','leaf','campfire'],
+  'friend':     ['users','users-three','handshake','chat-circle','heart'],
+  'family':     ['users','house','heart','baby','person'],
+  'baby':       ['baby','baby-carriage','pacifier','teddy-bear'],
+  'grow':       ['plant','leaf','tree','flower','trend-up','rocket'],
+  'star':       ['star','star-four','star-half','shooting-star','sparkle','seal'],
+  'fire':       ['fire','fire-simple','flame','campfire','lightning'],
+  'ice':        ['snowflake','ice-cream','thermometer-cold'],
+};
+
 const ICON_MAP = [
   ..._FEATURED,
   ..._ICON_NAMES.filter(n => !_FEATURED.includes(n)),
-].map(n => ({ n, k: n.replace(/-/g, ' ') }));
+].map(n => {
+  const base = n.replace(/-/g, ' ');
+  // Collect any extra synonym keywords for this icon
+  const extra = Object.entries(_ICON_SYNONYMS)
+    .filter(([, names]) => names.includes(n))
+    .map(([term]) => term)
+    .join(' ');
+  return { n, k: extra ? `${base} ${extra}` : base };
+});
 // Legacy alias so any remaining EMOJI_MAP references don't crash
 const EMOJI_MAP = ICON_MAP;
 
